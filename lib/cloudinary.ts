@@ -42,8 +42,12 @@ export const getWatermarkedCloudinaryUrl = (originalUrl: string, jobName: string
   // We want to insert transformations after '/upload/'
   // Example text overlay: l_text:Arial_40_bold:JOB%20NAME,g_south,y_40,co_white,b_black_50
   
-  const cleanJobName = encodeURIComponent(jobName.substring(0, 30));
-  const transform = `l_text:Arial_40_bold:${cleanJobName},g_south,y_40,co_white,b_black_50`;
+  // Strip commas from jobName because commas break Cloudinary URL params
+  const sanitizedJobName = jobName.replace(/,/g, '').substring(0, 30);
+  const cleanJobName = encodeURIComponent(sanitizedJobName);
+  
+  // b_rgb:00000080 is 50% opaque black background
+  const transform = `l_text:Arial_40_bold:${cleanJobName},g_south,y_40,co_white,b_rgb:00000080`;
 
   return originalUrl.replace('/upload/', `/upload/${transform}/`);
 };
