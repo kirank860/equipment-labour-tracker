@@ -77,7 +77,11 @@ export default function AdminLayout() {
   };
 
   const SidebarContent = () => (
-    <View className={`flex-1 bg-slate-950 flex-col pt-5 px-4 ${isMobile ? 'pb-24' : 'pb-8'}`}>
+    <ScrollView 
+      className="flex-1 bg-slate-950" 
+      contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 16, paddingBottom: isMobile ? 120 : 32 }}
+      showsVerticalScrollIndicator={false}
+    >
       <View className="flex-row items-center justify-between mb-10 px-2">
         <View className="flex-row items-center">
           <View className="bg-white p-1 rounded-xl mr-3 shadow-sm">
@@ -99,7 +103,7 @@ export default function AdminLayout() {
         )}
       </View>
 
-      <ScrollView className="flex-1 mb-2" showsVerticalScrollIndicator={false}>
+      <View className="mb-6">
         <Text className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-4 px-2">Menu</Text>
         <NavItem icon={LayoutDashboard} label="Dashboard" href="/(admin)/dashboard" />
         <NavItem icon={Truck} label="Equipment Entries" href="/(admin)/equipment" />
@@ -111,9 +115,9 @@ export default function AdminLayout() {
         <NavItem icon={Settings} label="Master Data" href="/(admin)/settings" />
         <NavItem icon={UserPlus} label="Foremans" href="/(admin)/employees" />
         <NavItem icon={Shield} label="Admins" href="/(admin)/admins" />
-      </ScrollView>
+      </View>
 
-      <View className="mt-auto">
+      <View className="mt-2">
         <View className="h-px bg-slate-900 mb-4" />
         <TouchableOpacity 
           onPress={handleLogout}
@@ -123,7 +127,7 @@ export default function AdminLayout() {
           <Text className="ml-3 font-outfit-semibold text-red-500">Logout</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 
   return (
