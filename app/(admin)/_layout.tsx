@@ -98,7 +98,7 @@ export default function AdminLayout() {
         )}
       </View>
 
-      <View className="flex-1">
+      <ScrollView className="flex-1 mb-2" showsVerticalScrollIndicator={false}>
         <Text className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-4 px-2">Menu</Text>
         <NavItem icon={LayoutDashboard} label="Dashboard" href="/(admin)/dashboard" />
         <NavItem icon={Truck} label="Equipment Entries" href="/(admin)/equipment" />
@@ -110,7 +110,7 @@ export default function AdminLayout() {
         <NavItem icon={Settings} label="Master Data" href="/(admin)/settings" />
         <NavItem icon={UserPlus} label="Foremans" href="/(admin)/employees" />
         <NavItem icon={Shield} label="Admins" href="/(admin)/admins" />
-      </View>
+      </ScrollView>
 
       <View className="mt-auto">
         <View className="h-px bg-slate-900 mb-4" />
