@@ -82,7 +82,7 @@ export default function AdminDashboard() {
       // Fetch both equipment and labour data for the selected date
       let equipQuery = supabase
         .from('equipment_entries')
-        .select('entry_date, foreman_name, equipment_master_id, rental_type, working_hours, status');
+        .select('entry_date, foreman_name, rental_type, working_hours, status, equipment_master(equipment_name)');
         
       let labourQuery = supabase
         .from('labour_entries')
@@ -110,8 +110,9 @@ export default function AdminDashboard() {
 
       let csvString = 'Type,Date,Foreman,Details,Hours,Status\n';
 
-      equipData?.forEach(e => {
-        csvString += `Equipment,${e.entry_date},"${e.foreman_name || ''}","Equip ID: ${e.equipment_master_id} (${e.rental_type})",${e.working_hours},${e.status}\n`;
+      equipData?.forEach((e: any) => {
+        const equipName = e.equipment_master?.equipment_name || 'Unknown Equipment';
+        csvString += `Equipment,${e.entry_date},"${e.foreman_name || ''}","${equipName} (${e.rental_type})",${e.working_hours},${e.status}\n`;
       });
 
       labourData?.forEach(l => {
