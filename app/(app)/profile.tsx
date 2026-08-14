@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal, Platform, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal, Platform, ActivityIndicator, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
@@ -65,7 +65,7 @@ export default function ProfileScreen() {
           />
         </View>
 
-        <View className="flex-1 px-6 pt-8 pb-32">
+        <ScrollView className="flex-1 px-6 pt-8" contentContainerStyle={{ paddingBottom: 130 }}>
           {/* Avatar Section */}
           <View className="items-center mb-10">
             <View className="w-24 h-24 bg-blue-100 rounded-full items-center justify-center border-4 border-white shadow-sm mb-4">
@@ -111,7 +111,7 @@ export default function ProfileScreen() {
             <LogOut size={20} color="#dc2626" />
             <Text className="text-red-600 font-bold text-lg ml-2">Sign Out</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
 
         {/* Custom Logout Modal */}
         <Modal
