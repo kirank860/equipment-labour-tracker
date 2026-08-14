@@ -77,7 +77,7 @@ export default function AdminLayout() {
   };
 
   const SidebarContent = () => (
-    <View className="flex-1 bg-slate-950 flex-col px-4 pt-5" style={{ paddingBottom: isMobile ? 100 : 24 }}>
+    <View className="flex-1 bg-slate-950 flex-col px-4 pt-5" style={{ paddingBottom: isMobile ? 32 : 24 }}>
       <View className="flex-row items-center justify-between mb-8 px-2">
         <View className="flex-row items-center">
           <View className="bg-white p-1 rounded-xl mr-3 shadow-sm">
@@ -207,7 +207,13 @@ export default function AdminLayout() {
       {/* Mobile Menu Modal */}
       {isMobile && (
         <Modal visible={menuOpen} animationType="slide" transparent={false}>
-          <View className="flex-1 bg-slate-950" style={{ paddingTop: Platform.OS === 'web' ? 0 : 40 }}>
+          <View 
+            className="flex-1 bg-slate-950" 
+            style={{ 
+              height: Platform.OS === 'web' ? '100dvh' : '100%', 
+              paddingTop: Platform.OS === 'web' ? 0 : 40 
+            }}
+          >
             <SidebarContent />
           </View>
         </Modal>
