@@ -39,15 +39,18 @@ export const uploadToCloudinary = async (
 export const getWatermarkedCloudinaryUrl = (originalUrl: string, jobName: string): string => {
   if (!originalUrl || !originalUrl.includes('res.cloudinary.com')) return originalUrl;
 
-  // We want to insert transformations after '/upload/'
-  // Example text overlay: l_text:Arial_40_bold:JOB%20NAME,g_south,y_40,co_white,b_black_50
+  const dateStr = new Date().toLocaleString();
+  const sanitizedJobName = jobName.replace(/,/g, '').substring(0, 35);
   
-  // Strip commas from jobName because commas break Cloudinary URL params
-  const sanitizedJobName = jobName.replace(/,/g, '').substring(0, 30);
+  const cleanDate = encodeURIComponent(dateStr);
   const cleanJobName = encodeURIComponent(sanitizedJobName);
   
-  // b_rgb:00000080 is 50% opaque black background
-  const transform = `l_text:Arial_40_bold:${cleanJobName},g_south,y_40,co_white,b_rgb:00000080`;
+  // %250A is the encoded newline for Cloudinary URL
+  const textStr = `${cleanDate}%250A${cleanJobName}%250AVerified%20Entry`;
+  
+  // c_limit,w_1200 normalizes the image width so the text size is consistent.
+  // b_rgb:000000B3 gives a 70% opacity black background block behind the text.
+  const transform = `c_limit,w_1200/l_text:Arial_30_bold_left:${textStr},co_white,b_rgb:000000B3,g_south_west,x_40,y_40`;
 
   return originalUrl.replace('/upload/', `/upload/${transform}/`);
 };

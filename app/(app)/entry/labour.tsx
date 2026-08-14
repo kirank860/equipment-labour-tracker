@@ -599,40 +599,27 @@ export default function LabourEntryScreen() {
           
           {photoUri ? (
             <View className="mb-3">
-              {Platform.OS === 'web' ? (
-                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
-                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
-                  
-                  {/* Watermark Overlay */}
-                  <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
-                    <Text className="text-white text-xs font-bold">
-                      {new Date().toLocaleString()}
-                    </Text>
-                    <Text className="text-white text-xs font-semibold">
-                      {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Unknown Site'}
-                    </Text>
-                    <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
-                  </View>
+              <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+                <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+                
+                {/* Watermark Overlay (Visual Preview) */}
+                <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
+                  <Text className="text-white text-xs font-bold">
+                    {new Date().toLocaleString()}
+                  </Text>
+                  <Text className="text-white text-xs font-semibold">
+                    {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Unknown Site'}
+                  </Text>
+                  <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
+                </View>
 
-                  <TouchableOpacity 
-                    onPress={() => setPhotoUri(null)}
-                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                  >
-                    <X size={20} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
-                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
-                  
-                  <TouchableOpacity 
-                    onPress={() => setPhotoUri(null)}
-                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                  >
-                    <X size={20} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              )}
+                <TouchableOpacity 
+                  onPress={() => setPhotoUri(null)}
+                  className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+                >
+                  <X size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
             </View>
           ) : Platform.OS === 'web' ? (
             <WebCamera onImageCaptured={setPhotoUri} colorTheme="green" />
