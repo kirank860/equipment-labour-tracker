@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
 import ViewShot from 'react-native-view-shot';
 import WebCamera from '../../../components/WebCamera';
-import { applyWatermarkWeb, downloadWebImage } from '../../../lib/watermark';
+import { applyWatermarkWeb } from '../../../lib/watermark';
 import TimePickerModal from '../../../components/TimePickerModal';
 
 // Helper for modal picker
@@ -79,6 +79,7 @@ export default function EquipmentEntryScreen() {
   const [successVisible, setSuccessVisible] = useState(false);
   const [navigating, setNavigating] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
 
   const viewShotRef = useRef<any>(null);
 
@@ -291,6 +292,7 @@ export default function EquipmentEntryScreen() {
           });
           if (entryData.equipment_photo_url && entryData.equipment_photo_url !== 'pending') {
             setPhotoUri(entryData.equipment_photo_url);
+            setInitialPhotoUri(entryData.equipment_photo_url);
           }
         }
       } else {
@@ -361,9 +363,9 @@ export default function EquipmentEntryScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      let uploadedPhotoUrl = 'pending';
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : 'pending';
 
-      if (photoUri) {
+      if (photoUri && (!id || photoUri !== initialPhotoUri)) {
         try {
           let finalBase64Uri = photoUri;
           if (Platform.OS !== 'web' && viewShotRef.current) {
@@ -375,10 +377,6 @@ export default function EquipmentEntryScreen() {
           }
 
           uploadedPhotoUrl = finalBase64Uri;
-          
-          if (Platform.OS === 'web') {
-            downloadWebImage(finalBase64Uri, `equipment_receipt_${Date.now()}.jpg`);
-          }
         } catch (err: any) {
           throw new Error('Photo processing failed: ' + (err.message || ''));
         }

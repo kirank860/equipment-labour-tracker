@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
 import ViewShot from 'react-native-view-shot';
 import WebCamera from '../../../components/WebCamera';
-import { applyWatermarkWeb, downloadWebImage } from '../../../lib/watermark';
+import { applyWatermarkWeb } from '../../../lib/watermark';
 import TimePickerModal from '../../../components/TimePickerModal';
 
 type Job = { id: string; job_number: string; job_name: string };
@@ -45,6 +45,7 @@ export default function LabourEntryScreen() {
   const [designationModalVisible, setDesignationModalVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
 
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
@@ -168,6 +169,7 @@ export default function LabourEntryScreen() {
           
           if (entryData.labour_photo_url && entryData.labour_photo_url !== 'pending') {
             setPhotoUri(entryData.labour_photo_url);
+            setInitialPhotoUri(entryData.labour_photo_url);
           }
         }
       }
@@ -220,9 +222,9 @@ export default function LabourEntryScreen() {
     try {
       const { data: userData } = await supabase.auth.getUser();
       
-      let uploadedPhotoUrl = 'pending';
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : 'pending';
 
-      if (photoUri) {
+      if (photoUri && (!id || photoUri !== initialPhotoUri)) {
         try {
           let finalBase64Uri = photoUri;
           if (Platform.OS !== 'web' && viewShotRef.current) {
@@ -233,10 +235,6 @@ export default function LabourEntryScreen() {
           }
 
           uploadedPhotoUrl = finalBase64Uri;
-          
-          if (Platform.OS === 'web') {
-            downloadWebImage(finalBase64Uri, `labour_receipt_${Date.now()}.jpg`);
-          }
         } catch (err: any) {
           throw new Error('Photo processing failed: ' + (err.message || ''));
         }

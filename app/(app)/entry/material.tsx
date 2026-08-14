@@ -77,6 +77,7 @@ export default function MaterialTransferEntryScreen() {
   const [successVisible, setSuccessVisible] = useState(false);
   const [navigating, setNavigating] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
 
   const viewShotRef = useRef<any>(null);
 
@@ -176,6 +177,7 @@ export default function MaterialTransferEntryScreen() {
           });
           if (entryData.photo_url && entryData.photo_url !== 'pending') {
             setPhotoUri(entryData.photo_url);
+            setInitialPhotoUri(entryData.photo_url);
           }
         }
       } else {
@@ -231,9 +233,9 @@ export default function MaterialTransferEntryScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      let uploadedPhotoUrl = 'pending';
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : 'pending';
 
-      if (photoUri) {
+      if (photoUri && (!id || photoUri !== initialPhotoUri)) {
         try {
           let finalBase64Uri = photoUri;
           if (Platform.OS !== 'web' && viewShotRef.current) {
@@ -245,10 +247,6 @@ export default function MaterialTransferEntryScreen() {
           }
 
           uploadedPhotoUrl = finalBase64Uri;
-          
-          if (Platform.OS === 'web') {
-            downloadWebImage(finalBase64Uri, `material_receipt_${Date.now()}.jpg`);
-          }
         } catch (err: any) {
           throw new Error('Photo processing failed: ' + (err.message || ''));
         }
