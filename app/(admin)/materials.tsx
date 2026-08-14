@@ -579,8 +579,8 @@ export default function AdminMaterials() {
                   </View>
                 </View>
 
-                <View className="flex-row items-center justify-between border-t border-slate-100 pt-4">
-                  <View className="flex-row items-center">
+                <View className="flex-row flex-wrap items-center justify-between border-t border-slate-100 pt-4 gap-y-3">
+                  <View className="flex-row items-center mr-2">
                     <View className="w-8 h-8 rounded-full bg-slate-200 items-center justify-center mr-2">
                       <Text className="text-slate-600 font-bold text-xs">
                         {entry.foreman_name ? entry.foreman_name.substring(0, 2).toUpperCase() : 'FM'}
