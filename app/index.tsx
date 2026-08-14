@@ -33,7 +33,7 @@ export default function LoginScreen() {
     try {
       // Append a pseudo-domain to allow Supabase to use its secure email/password auth 
       // while letting the user just type their username.
-      const pseudoEmail = `${username.toLowerCase().trim()}@truxo.local`;
+      const pseudoEmail = `${username.toLowerCase().trim()}@islandtower.local`;
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email: pseudoEmail,

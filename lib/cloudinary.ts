@@ -39,8 +39,11 @@ export const uploadToCloudinary = async (
 export const getWatermarkedCloudinaryUrl = (originalUrl: string, jobName: string): string => {
   if (!originalUrl || !originalUrl.includes('res.cloudinary.com')) return originalUrl;
 
-  const dateStr = new Date().toLocaleString();
-  const sanitizedJobName = jobName.replace(/,/g, '').substring(0, 35);
+  // Format date manually to avoid slashes (/) and commas (,) which break Cloudinary URLs
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  
+  const sanitizedJobName = jobName.replace(/[,/]/g, '').substring(0, 35);
   
   const cleanDate = encodeURIComponent(dateStr);
   const cleanJobName = encodeURIComponent(sanitizedJobName);
