@@ -136,7 +136,8 @@ export default function AdminAttendance() {
   };
 
   return (
-    <View className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
+    <View className="flex-1 bg-slate-50">
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
       <View className={`flex-row justify-between items-center mb-8 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
         <View>
           <Text className="text-slate-900 text-3xl font-black tracking-tight">Attendance</Text>
@@ -172,13 +173,13 @@ export default function AdminAttendance() {
       </View>
 
       {/* Main Content */}
-      <View className="flex-1 bg-transparent overflow-hidden">
+      <View className="bg-transparent overflow-hidden">
         {loading ? (
           <View className="flex-1 justify-center items-center py-20">
             <ActivityIndicator size="large" color="#0f172a" />
           </View>
         ) : (
-          <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 24 }}>
+          <View className="flex-1 pb-6">
             {groupedLogs.length === 0 ? (
               <View className="py-20 items-center">
                 <View className="bg-slate-100 p-4 rounded-full mb-4">
@@ -229,9 +230,10 @@ export default function AdminAttendance() {
                 })}
               </View>
             )}
-          </ScrollView>
+          </View>
         )}
       </View>
+      </ScrollView>
 
       {/* Details Modal */}
       <Modal visible={!!selectedUser} transparent animationType="slide" onRequestClose={() => setSelectedUser(null)}>
