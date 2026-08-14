@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, useWindowDimensions, Modal, SafeAreaView, ActivityIndicator, Image, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, useWindowDimensions, Modal, SafeAreaView, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
 import { Slot, useRouter, usePathname } from 'expo-router';
 import { Truck, Users, LayoutDashboard, LogOut, Settings, UserPlus, Menu, X, AlertTriangle, FileText, Shield, MapPin, ArrowRightLeft, Clock as AttendanceIcon } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
