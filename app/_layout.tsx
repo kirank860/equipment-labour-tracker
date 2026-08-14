@@ -1,8 +1,10 @@
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Slot, useRouter, useSegments, SplashScreen } from 'expo-router';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import '../global.css';
+
+SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
   const { initialized, user } = useAuth();
@@ -37,6 +39,10 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+
   return (
     <AuthProvider>
       <RootLayoutNav />

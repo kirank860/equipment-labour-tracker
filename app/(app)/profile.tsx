@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal, Platform, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { User, Mail, LogOut, Shield } from 'lucide-react-native';
 
 export default function ProfileScreen() {
@@ -11,22 +11,58 @@ export default function ProfileScreen() {
   const router = useRouter();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setIsTransitioning(true);
+      const timer = setTimeout(() => setIsTransitioning(false), 300);
+      return () => clearTimeout(timer);
+    }, [])
+  );
 
   const handleLogoutConfirm = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    if (user?.id) {
+      // Admin might not have access to insert attendance logs but profile is for foremen
+      await supabase.from('attendance_logs').insert({
+        user_id: user.id,
+        action: 'LOGOUT'
+      });
+    }
+
+    await Promise.all([
+      supabase.auth.signOut(),
+      new Promise(resolve => setTimeout(resolve, 2000))
+    ]);
+    setIsLoggingOut(false);
     setShowLogoutModal(false);
-    await supabase.auth.signOut();
     router.replace('/');
   };
 
   const username = user?.email?.split('@')[0] || 'Foreman';
   const role = user?.email?.includes('admin') ? 'Administrator' : 'Foreman';
 
+  if (isTransitioning) {
+    return (
+      <View className="flex-1 bg-slate-50 justify-center items-center">
+        <ActivityIndicator size="large" color="#1e3a8a" />
+      </View>
+    );
+  }
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView className="flex-1 bg-slate-50">
-        {/* Header */}
-        <View className="px-6 py-6 border-b border-slate-200 bg-white">
+        <View className="px-6 py-5 border-b border-slate-200 bg-white flex-row justify-between items-center">
           <Text className="text-slate-900 text-3xl font-black tracking-tight">Profile</Text>
+          <Image 
+            source={require('../../assets/images/island_tower_logo.jpg')} 
+            style={{ width: 40, height: 40, borderRadius: 8 }}
+            resizeMode="contain" 
+          />
         </View>
 
         <View className="flex-1 px-6 pt-8 pb-32">
@@ -104,9 +140,14 @@ export default function ProfileScreen() {
                 
                 <TouchableOpacity 
                   onPress={handleLogoutConfirm}
-                  className="flex-1 bg-red-600 py-4 rounded-2xl ml-2 items-center active:bg-red-700 shadow-sm shadow-red-200"
+                  disabled={isLoggingOut}
+                  className={`flex-1 ${isLoggingOut ? 'bg-red-400' : 'bg-red-600'} py-4 rounded-2xl ml-2 items-center flex-row justify-center active:bg-red-700 shadow-sm shadow-red-200`}
                 >
-                  <Text className="text-white font-bold text-lg">Sign Out</Text>
+                  {isLoggingOut ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text className="text-white font-bold text-lg">Sign Out</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>

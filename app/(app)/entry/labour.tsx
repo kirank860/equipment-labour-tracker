@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Modal, FlatList, ActivityIndicator, Platform, Image, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { ArrowLeft, ChevronDown, Clock, User, Briefcase, Calendar, Check, Camera, Image as ImageIcon, X, Users } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
+import ViewShot from 'react-native-view-shot';
+import WebCamera from '../../../components/WebCamera';
+import { applyWatermarkWeb, downloadWebImage } from '../../../lib/watermark';
+import TimePickerModal from '../../../components/TimePickerModal';
 
 type Job = { id: string; job_number: string; job_name: string };
 type Supplier = { id: string; supplier_name: string };
@@ -20,7 +24,9 @@ export default function LabourEntryScreen() {
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
   const [designations, setDesignations] = useState<Designation[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [entryDate, setEntryDate] = useState(getLocalDateString());
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -40,36 +46,30 @@ export default function LabourEntryScreen() {
   const [successVisible, setSuccessVisible] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
-  const pickImage = async (useCamera = false) => {
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+
+  const viewShotRef = useRef<any>(null);
+
+  const pickImage = async () => {
     try {
-      if (useCamera) {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Sorry, we need camera permissions to make this work!');
-          return;
-        }
-      } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to make this work!');
-          return;
-        }
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'We need camera permissions to verify labour on-site!');
+        return;
       }
 
-      const result = useCamera 
-        ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.7,
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.7,
-          });
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.7,
+        base64: true,
+      });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setPhotoUri(result.assets[0].uri);
+        const base64Uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        setPhotoUri(base64Uri);
+        if (errors.photo) setErrors(prev => ({ ...prev, photo: '' }));
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -77,9 +77,50 @@ export default function LabourEntryScreen() {
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchFormData();
+    }, [id])
+  );
+
   useEffect(() => {
-    fetchFormData();
-  }, []);
+    const fetchAllocations = async () => {
+      if (!selectedJob) {
+        setSuppliers([]);
+        return;
+      }
+      try {
+        const { data } = await supabase.from('job_suppliers').select('supplier_id').eq('job_id', selectedJob.id);
+        if (data) {
+          const allocatedIds = new Set(data.map(d => d.supplier_id));
+          const filtered = allSuppliers.filter(s => allocatedIds.has(s.id));
+          setSuppliers(filtered);
+          
+          if (selectedSupplier && !allocatedIds.has(selectedSupplier.id)) {
+             setSelectedSupplier(null);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    
+    if (allSuppliers.length > 0) {
+      fetchAllocations();
+    }
+  }, [selectedJob, allSuppliers]);
+
+  useEffect(() => {
+    if (selectedJob && errors.job) setErrors(prev => ({ ...prev, job: '' }));
+  }, [selectedJob]);
+  
+  useEffect(() => {
+    if (selectedSupplier && errors.supplier) setErrors(prev => ({ ...prev, supplier: '' }));
+  }, [selectedSupplier]);
+  
+  useEffect(() => {
+    if (selectedDesignation && errors.designation) setErrors(prev => ({ ...prev, designation: '' }));
+  }, [selectedDesignation]);
 
   const fetchFormData = async () => {
     try {
@@ -92,7 +133,9 @@ export default function LabourEntryScreen() {
       ]);
 
       if (jobsRes.data) setJobs(jobsRes.data);
-      if (suppliersRes.data) setSuppliers(suppliersRes.data);
+      if (suppliersRes.data) {
+        setAllSuppliers(suppliersRes.data);
+      }
       if (designationsRes.data) setDesignations(designationsRes.data);
 
       if (user) {
@@ -108,7 +151,7 @@ export default function LabourEntryScreen() {
       }
 
       if (id) {
-        const { data: entryData } = await supabase.from('labour_entries').select('*').eq('id', id).single();
+        const { data: entryData } = await supabase.from('labour_entries').select('*').eq('id', id).eq('created_by', user.id).single();
         if (entryData) {
           setEntryDate(entryData.entry_date);
           if (jobsRes.data) setSelectedJob(jobsRes.data.find((j: any) => j.id === entryData.job_id) || null);
@@ -158,8 +201,18 @@ export default function LabourEntryScreen() {
   const totalWorkingHours = calculateTotalHours();
 
   const handleSubmit = async () => {
-    if (!selectedJob || !selectedSupplier || !employeeName || !selectedDesignation || !startTime || !endTime || !foremanName) {
-      Alert.alert('Validation', 'Please fill in all required fields.');
+    const newErrors: Record<string, string> = {};
+    if (!selectedJob) newErrors.job = 'Job is required';
+    if (!selectedSupplier) newErrors.supplier = 'Supplier is required';
+    if (!employeeName) newErrors.employee_name = 'Employee Name is required';
+    if (!selectedDesignation) newErrors.designation = 'Designation is required';
+    if (!startTime) newErrors.start_time = 'Start Time is required';
+    if (!endTime) newErrors.end_time = 'End Time is required';
+    if (!foremanName) newErrors.foreman_name = 'Foreman Name is required';
+    if (!photoUri && !id) newErrors.photo = 'Live photo is required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
@@ -171,23 +224,21 @@ export default function LabourEntryScreen() {
 
       if (photoUri) {
         try {
-          const fileName = `labour_${Date.now()}.jpg`;
-          const response = await fetch(photoUri);
-          const blob = await response.blob();
-          
-          const { data, error: uploadError } = await supabase.storage
-            .from('receipts')
-            .upload(fileName, blob, { contentType: 'image/jpeg' });
-            
-          if (uploadError) {
-            console.error('Upload error:', uploadError);
-            throw new Error('Failed to upload photo. Please ensure the "receipts" bucket exists and is public.');
+          let finalBase64Uri = photoUri;
+          if (Platform.OS !== 'web' && viewShotRef.current) {
+            finalBase64Uri = await viewShotRef.current.capture();
+          } else if (Platform.OS === 'web') {
+            const jobName = selectedJob ? selectedJob.job_name : 'Unknown Site';
+            finalBase64Uri = await applyWatermarkWeb(photoUri, jobName);
           }
+
+          uploadedPhotoUrl = finalBase64Uri;
           
-          const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(fileName);
-          uploadedPhotoUrl = publicUrl;
+          if (Platform.OS === 'web') {
+            downloadWebImage(finalBase64Uri, `labour_receipt_${Date.now()}.jpg`);
+          }
         } catch (err: any) {
-          throw new Error(err.message || 'Photo upload failed');
+          throw new Error('Photo processing failed: ' + (err.message || ''));
         }
       }
 
@@ -212,7 +263,7 @@ export default function LabourEntryScreen() {
 
       let error;
       if (id) {
-        const { error: updateError } = await supabase.from('labour_entries').update(payload).eq('id', id);
+        const { error: updateError } = await supabase.from('labour_entries').update(payload).eq('id', id).eq('created_by', userData?.user?.id);
         error = updateError;
       } else {
         const { error: insertError } = await supabase.from('labour_entries').insert(payload);
@@ -288,6 +339,27 @@ export default function LabourEntryScreen() {
     <SafeAreaView className="flex-1 bg-slate-50">
       <StatusBar barStyle="light-content" />
       
+      {/* Modals */}
+      <TimePickerModal 
+        visible={showStartTimePicker}
+        time={startTime}
+        onClose={() => setShowStartTimePicker(false)}
+        onSelect={(t) => {
+          setStartTime(t);
+          if (errors.start_time) setErrors(prev => ({ ...prev, start_time: '' }));
+        }}
+      />
+
+      <TimePickerModal 
+        visible={showEndTimePicker}
+        time={endTime}
+        onClose={() => setShowEndTimePicker(false)}
+        onSelect={(t) => {
+          setEndTime(t);
+          if (errors.end_time) setErrors(prev => ({ ...prev, end_time: '' }));
+        }}
+      />
+
       {/* Header */}
       <View className="flex-row items-center justify-between px-6 py-4 bg-[#166534]">
         <View className="flex-row items-center">
@@ -374,50 +446,56 @@ export default function LabourEntryScreen() {
           </Text>
           <TouchableOpacity 
             onPress={() => setJobModalVisible(true)}
-            className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 py-3 h-14 active:opacity-70"
+            className={`flex-row items-center bg-white border ${errors.job ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 py-3 h-14 active:opacity-70`}
           >
             <View className="mr-3">
-              <Briefcase size={20} color="#94a3b8" />
+              <Briefcase size={20} color={errors.job ? "#ef4444" : "#94a3b8"} />
             </View>
             <Text className={`flex-1 text-base ${selectedJob ? 'text-slate-900' : 'text-slate-400'}`}>
               {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Select Job'}
             </Text>
-            <ChevronDown size={20} color="#94a3b8" />
+            <ChevronDown size={20} color={errors.job ? "#ef4444" : "#94a3b8"} />
           </TouchableOpacity>
+          {errors.job ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.job}</Text> : null}
         </View>
 
-        <View className="mb-4">
+        <View className={`mb-4 ${!selectedJob ? 'opacity-50' : ''}`}>
           <Text className="text-sm font-medium text-slate-700 mb-1">
             Supplier <Text className="text-red-500">*</Text>
           </Text>
           <TouchableOpacity 
-            onPress={() => setSupplierModalVisible(true)}
-            className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 py-3 h-14 active:opacity-70"
+            onPress={() => selectedJob && setSupplierModalVisible(true)}
+            className={`flex-row items-center bg-white border ${errors.supplier ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 py-3 h-14 active:opacity-70`}
           >
             <View className="mr-3">
-              <User size={20} color="#94a3b8" />
+              <User size={20} color={errors.supplier ? "#ef4444" : "#94a3b8"} />
             </View>
             <Text className={`flex-1 text-base ${selectedSupplier ? 'text-slate-900' : 'text-slate-400'}`}>
-              {selectedSupplier?.supplier_name || 'Select Supplier'}
+              {selectedSupplier?.supplier_name || (selectedJob ? 'Select Supplier' : 'Please select a Job Number first')}
             </Text>
-            <ChevronDown size={20} color="#94a3b8" />
+            <ChevronDown size={20} color={errors.supplier ? "#ef4444" : "#94a3b8"} />
           </TouchableOpacity>
+          {errors.supplier ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.supplier}</Text> : null}
         </View>
 
         <View className="mb-4">
           <Text className="text-sm font-medium text-slate-700 mb-1">
             Employee Name <Text className="text-red-500">*</Text>
           </Text>
-          <View className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 h-14">
-            <User size={20} color="#94a3b8" className="mr-3" />
+          <View className={`flex-row items-center bg-white border ${errors.employee_name ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}>
+            <User size={20} color={errors.employee_name ? "#ef4444" : "#94a3b8"} className="mr-3" />
             <TextInput
               className="flex-1 text-slate-900 text-base font-medium"
               placeholder="Enter employee name"
               placeholderTextColor="#94a3b8"
               value={employeeName}
-              onChangeText={setEmployeeName}
+              onChangeText={(t) => {
+                setEmployeeName(t);
+                if (errors.employee_name) setErrors(prev => ({ ...prev, employee_name: '' }));
+              }}
             />
           </View>
+          {errors.employee_name ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.employee_name}</Text> : null}
         </View>
 
         <View className="mb-4">
@@ -426,16 +504,17 @@ export default function LabourEntryScreen() {
           </Text>
           <TouchableOpacity 
             onPress={() => setDesignationModalVisible(true)}
-            className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 py-3 h-14 active:opacity-70"
+            className={`flex-row items-center bg-white border ${errors.designation ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 py-3 h-14 active:opacity-70`}
           >
             <View className="mr-3">
-              <Briefcase size={20} color="#94a3b8" />
+              <Briefcase size={20} color={errors.designation ? "#ef4444" : "#94a3b8"} />
             </View>
             <Text className={`flex-1 text-base ${selectedDesignation ? 'text-slate-900' : 'text-slate-400'}`}>
               {selectedDesignation?.designation_name || 'Select Designation'}
             </Text>
-            <ChevronDown size={20} color="#94a3b8" />
+            <ChevronDown size={20} color={errors.designation ? "#ef4444" : "#94a3b8"} />
           </TouchableOpacity>
+          {errors.designation ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.designation}</Text> : null}
         </View>
 
         <View className="flex-row mb-4 gap-x-4">
@@ -443,50 +522,28 @@ export default function LabourEntryScreen() {
             <Text className="text-sm font-medium text-slate-700 mb-1">
               Start Time <Text className="text-red-500">*</Text>
             </Text>
-            <View className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 h-14">
+            <TouchableOpacity 
+              onPress={() => setShowStartTimePicker(true)}
+              className={`flex-row items-center bg-white border ${errors.start_time ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}
+            >
               <Clock size={18} color="#94a3b8" className="mr-2" />
-              {Platform.OS === 'web' ? (
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: '#0f172a', fontSize: '16px', fontWeight: '500', fontFamily: 'inherit' }}
-                />
-              ) : (
-                <TextInput
-                  className="flex-1 text-slate-900 text-base font-medium"
-                  placeholder="08:00"
-                  placeholderTextColor="#94a3b8"
-                  value={startTime}
-                  onChangeText={setStartTime}
-                />
-              )}
-            </View>
+              <Text className="flex-1 text-slate-900 text-base font-medium">{startTime}</Text>
+            </TouchableOpacity>
+            {errors.start_time ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.start_time}</Text> : null}
           </View>
 
           <View className="flex-1">
             <Text className="text-sm font-medium text-slate-700 mb-1">
               End Time <Text className="text-red-500">*</Text>
             </Text>
-            <View className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 h-14">
+            <TouchableOpacity 
+              onPress={() => setShowEndTimePicker(true)}
+              className={`flex-row items-center bg-white border ${errors.end_time ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}
+            >
               <Clock size={18} color="#94a3b8" className="mr-2" />
-              {Platform.OS === 'web' ? (
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: '#0f172a', fontSize: '16px', fontWeight: '500', fontFamily: 'inherit' }}
-                />
-              ) : (
-                <TextInput
-                  className="flex-1 text-slate-900 text-base font-medium"
-                  placeholder="17:00"
-                  placeholderTextColor="#94a3b8"
-                  value={endTime}
-                  onChangeText={setEndTime}
-                />
-              )}
-            </View>
+              <Text className="flex-1 text-slate-900 text-base font-medium">{endTime}</Text>
+            </TouchableOpacity>
+            {errors.end_time ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.end_time}</Text> : null}
           </View>
         </View>
 
@@ -517,15 +574,19 @@ export default function LabourEntryScreen() {
           <Text className="text-sm font-medium text-slate-700 mb-1">
             Foreman Name <Text className="text-red-500">*</Text>
           </Text>
-          <View className="bg-white border border-slate-300 rounded-lg px-4 h-14 justify-center">
+          <View className={`bg-white border ${errors.foreman_name ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14 justify-center`}>
             <TextInput
               className="flex-1 text-slate-900 text-base"
               placeholder="Enter foreman name"
               placeholderTextColor="#94a3b8"
               value={foremanName}
-              onChangeText={setForemanName}
+              onChangeText={(t) => {
+                setForemanName(t);
+                if (errors.foreman_name) setErrors(prev => ({ ...prev, foreman_name: '' }));
+              }}
             />
           </View>
+          {errors.foreman_name ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.foreman_name}</Text> : null}
         </View>
 
         <View className="mb-4">
@@ -541,38 +602,73 @@ export default function LabourEntryScreen() {
           </View>
         </View>
 
-        <View className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
-          <Text className="text-slate-700 text-sm font-medium mb-3">Attach Timesheet Photo (Optional)</Text>
+        <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
+          <Text className="text-slate-700 text-sm font-medium mb-3">Attach Timesheet Photo (Live Camera Only) <Text className="text-red-500">*</Text></Text>
+          {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
           
           {photoUri ? (
             <View className="mb-3">
-              <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200">
-                <Image source={{ uri: photoUri }} className="w-full h-full" resizeMode="cover" />
-                <TouchableOpacity 
-                  onPress={() => setPhotoUri(null)}
-                  className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                >
-                  <X size={20} color="#fff" />
-                </TouchableOpacity>
-              </View>
+              {Platform.OS === 'web' ? (
+                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+                  
+                  {/* Watermark Overlay */}
+                  <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
+                    <Text className="text-white text-xs font-bold">
+                      {new Date().toLocaleString()}
+                    </Text>
+                    <Text className="text-white text-xs font-semibold">
+                      {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Unknown Site'}
+                    </Text>
+                    <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
+                  </View>
+
+                  <TouchableOpacity 
+                    onPress={() => setPhotoUri(null)}
+                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+                  >
+                    <X size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.7, result: 'data-uri' }}>
+                  <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+                    <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+                    
+                    {/* Watermark Overlay */}
+                    <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
+                      <Text className="text-white text-xs font-bold">
+                        {new Date().toLocaleString()}
+                      </Text>
+                      <Text className="text-white text-xs font-semibold">
+                        {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Unknown Site'}
+                      </Text>
+                      <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
+                    </View>
+
+                    <TouchableOpacity 
+                      onPress={() => setPhotoUri(null)}
+                      className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+                    >
+                      <X size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </ViewShot>
+              )}
             </View>
+          ) : Platform.OS === 'web' ? (
+            <WebCamera onImageCaptured={setPhotoUri} colorTheme="green" />
           ) : (
-            <View className="flex-row gap-3">
-              <TouchableOpacity 
-                onPress={() => pickImage(true)}
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg py-4 flex-row items-center justify-center active:bg-slate-100"
-              >
-                <Camera size={20} color="#64748b" />
-                <Text className="text-slate-700 ml-2 font-semibold">Camera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => pickImage(false)}
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg py-4 flex-row items-center justify-center active:bg-slate-100"
-              >
-                <ImageIcon size={20} color="#64748b" />
-                <Text className="text-slate-700 ml-2 font-semibold">Gallery</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity 
+              onPress={pickImage}
+              className="bg-green-50 border-2 border-dashed border-green-200 rounded-lg py-8 items-center justify-center active:bg-green-100"
+            >
+              <Camera size={32} color="#16a34a" className="mb-2" />
+              <Text className="text-green-900 font-bold text-base">Take Live Photo</Text>
+              <Text className="text-green-600 text-xs mt-1 text-center px-4">
+                Photos are time and location stamped to prevent fraud.
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
 

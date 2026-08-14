@@ -27,7 +27,7 @@ export default function EmployeesScreen() {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .order('role')
+        .eq('role', 'FOREMAN')
         .order('full_name');
         
       if (error) throw error;
@@ -98,7 +98,7 @@ export default function EmployeesScreen() {
       <View className={`flex-row justify-between items-center mb-8 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
         <View>
           <View className="flex-row items-center">
-            <Text className="text-slate-900 text-3xl font-black tracking-tight mr-3">Employees</Text>
+            <Text className="text-slate-900 text-3xl font-black tracking-tight mr-3">Foremans</Text>
             <View className="bg-blue-100 px-3 py-1 rounded-full border border-blue-200">
               <Text className="text-blue-700 font-bold text-xs">{usersList.length} Total</Text>
             </View>

@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Truck, Users, Calendar, Clock, Edit2, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, Truck, Users, Calendar, Clock, Edit2, ChevronLeft, ChevronRight, ArrowRightLeft } from 'lucide-react-native';
+import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString } from '../../lib/dateUtils';
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { date, type, status } = useLocalSearchParams<{ date?: string, type?: string, status?: string }>();
   
   const [activeTab, setActiveTab] = useState(type || 'EQUIPMENT');
@@ -37,15 +39,17 @@ export default function HistoryScreen() {
             working_hours,
             status,
             rejection_reason,
+            remarks,
             equipment_master:equipment_master_id (equipment_name),
             jobs:job_id (job_name)
           `)
           .eq('entry_date', dateStr)
+          .eq('created_by', user?.id)
           .order('created_at', { ascending: false });
           
         if (error) throw error;
         setEntries(data || []);
-      } else {
+      } else if (activeTab === 'LABOUR') {
         const { data, error } = await supabase
           .from('labour_entries')
           .select(`
@@ -55,10 +59,33 @@ export default function HistoryScreen() {
             total_working_hours,
             status,
             rejection_reason,
+            remarks,
             jobs:job_id (job_name),
             labour_designations:designation_id (designation_name)
           `)
           .eq('entry_date', dateStr)
+          .eq('created_by', user?.id)
+          .order('created_at', { ascending: false });
+          
+        if (error) throw error;
+        setEntries(data || []);
+      } else if (activeTab === 'MATERIAL') {
+        const { data, error } = await supabase
+          .from('material_transfers')
+          .select(`
+            id,
+            entry_date,
+            material_description,
+            quantity,
+            unit,
+            status,
+            rejection_reason,
+            remarks,
+            from_job:from_job_id (job_name),
+            to_job:to_job_id (job_name)
+          `)
+          .eq('entry_date', dateStr)
+          .eq('created_by', user?.id)
           .order('created_at', { ascending: false });
           
         if (error) throw error;
@@ -158,27 +185,37 @@ export default function HistoryScreen() {
         </View>
       </View>
 
-      {/* Tabs */}
-      <View className="flex-row px-4 py-2 space-x-2">
-        <TouchableOpacity 
-          className={`flex-1 flex-row items-center justify-center py-3 rounded-xl border ${activeTab === 'EQUIPMENT' ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200'}`}
-          onPress={() => setActiveTab('EQUIPMENT')}
-        >
-          <Truck size={18} color={activeTab === 'EQUIPMENT' ? '#1e3a8a' : '#94a3b8'} />
-          <Text className={`ml-2 font-bold tracking-tight ${activeTab === 'EQUIPMENT' ? 'text-[#1e3a8a]' : 'text-slate-500'}`}>
-            Equipment
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          className={`flex-1 flex-row items-center justify-center py-3 rounded-xl border active:scale-[0.98] transition-all ${activeTab === 'LABOUR' ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}
-          onPress={() => { setActiveTab('LABOUR'); setStatusFilter('ALL'); }}
-        >
-          <Users size={18} color={activeTab === 'LABOUR' ? '#059669' : '#94a3b8'} />
-          <Text className={`ml-2 font-bold tracking-tight ${activeTab === 'LABOUR' ? 'text-[#059669]' : 'text-slate-500'}`}>
-            Labour
-          </Text>
-        </TouchableOpacity>
+      {/* Custom Segmented Control */}
+      <View className="px-4 mb-4">
+        <View className="flex-row bg-slate-100 p-1 rounded-xl">
+          <TouchableOpacity 
+            onPress={() => setActiveTab('EQUIPMENT')}
+            className={`flex-1 flex-row items-center justify-center py-3 rounded-lg ${activeTab === 'EQUIPMENT' ? 'bg-white shadow-sm' : ''}`}
+          >
+            <Truck size={16} color={activeTab === 'EQUIPMENT' ? '#1e3a8a' : '#64748b'} />
+            <Text className={`ml-2 font-bold ${activeTab === 'EQUIPMENT' ? 'text-blue-900' : 'text-slate-500'}`}>
+              Equipment
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => setActiveTab('LABOUR')}
+            className={`flex-1 flex-row items-center justify-center py-3 rounded-lg ${activeTab === 'LABOUR' ? 'bg-white shadow-sm' : ''}`}
+          >
+            <Users size={16} color={activeTab === 'LABOUR' ? '#1e3a8a' : '#64748b'} />
+            <Text className={`ml-2 font-bold ${activeTab === 'LABOUR' ? 'text-blue-900' : 'text-slate-500'}`}>
+              Labour
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => setActiveTab('MATERIAL')}
+            className={`flex-1 flex-row items-center justify-center py-3 rounded-lg ${activeTab === 'MATERIAL' ? 'bg-white shadow-sm' : ''}`}
+          >
+            <ArrowRightLeft size={16} color={activeTab === 'MATERIAL' ? '#1e3a8a' : '#64748b'} />
+            <Text className={`ml-2 font-bold ${activeTab === 'MATERIAL' ? 'text-blue-900' : 'text-slate-500'}`}>
+              Material
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Status Filters */}
@@ -247,19 +284,28 @@ export default function HistoryScreen() {
             <View className="flex-row items-center mb-4">
               <View className="bg-slate-800 px-3 py-1.5 rounded-lg">
                 <Text className="text-white font-black text-xs tracking-wide">
-                  {filteredEntries.length} {activeTab === 'EQUIPMENT' ? 'Equipment' : 'Labour'} {filteredEntries.length === 1 ? 'Entry' : 'Entries'}
+                  {filteredEntries.length} {activeTab === 'EQUIPMENT' ? 'Equipment' : activeTab === 'LABOUR' ? 'Labour' : 'Material'} {filteredEntries.length === 1 ? 'Entry' : 'Entries'}
                 </Text>
               </View>
               <View className="flex-1 h-px bg-slate-200 ml-3" />
             </View>
 
             {filteredEntries.map((entry) => (
-              <View key={entry.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-3">
+              <TouchableOpacity 
+                key={entry.id} 
+                className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-3 active:bg-slate-50"
+                onPress={() => {
+                  // In a future update, we can show a detailed modal here if needed
+                  // For now, it just gives touch feedback
+                }}
+              >
                 <View className="flex-row justify-between items-start mb-2">
                   <Text className="font-black tracking-tight text-slate-900 flex-1 text-lg" numberOfLines={1}>
                     {activeTab === 'EQUIPMENT' 
                       ? entry.equipment_master?.equipment_name || 'Unknown Equipment' 
-                      : entry.employee_name || 'Unknown Employee'}
+                      : activeTab === 'LABOUR'
+                        ? entry.employee_name || 'Unknown Employee'
+                        : entry.material_description || 'Unknown Material'}
                   </Text>
                   <Text className={`font-bold tracking-wide text-[10px] px-2 py-1 border rounded uppercase ${getStatusColor(entry.status)} ${getStatusBg(entry.status)}`}>
                     {entry.status || 'SUBMITTED'}
@@ -269,7 +315,9 @@ export default function HistoryScreen() {
                 <Text className="text-slate-500 font-medium mb-3 leading-relaxed">
                   {activeTab === 'EQUIPMENT' 
                     ? entry.jobs?.job_name 
-                    : `${entry.labour_designations?.designation_name} @ ${entry.jobs?.job_name}`}
+                    : activeTab === 'LABOUR'
+                      ? `${entry.labour_designations?.designation_name} @ ${entry.jobs?.job_name}`
+                      : `${entry.from_job?.job_name} -> ${entry.to_job?.job_name}`}
                 </Text>
 
                 {entry.status === 'REJECTED' && entry.rejection_reason && (
@@ -279,28 +327,52 @@ export default function HistoryScreen() {
                   </View>
                 )}
 
+                {entry.remarks && (
+                  <View className="bg-slate-50 border border-slate-100 rounded-lg p-3 mb-3">
+                    <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-wider mb-1">Remarks</Text>
+                    <Text className="text-slate-700 text-sm leading-tight italic">"{entry.remarks}"</Text>
+                  </View>
+                )}
+
                 <View className="flex-row justify-between border-t border-slate-100 pt-3">
                   <View className="flex-row items-center">
-                    <Clock size={14} color="#94a3b8" />
-                    <Text className="text-slate-500 text-xs font-medium ml-1.5">
-                      <Text className="text-slate-900 font-bold">{activeTab === 'EQUIPMENT' ? entry.working_hours : entry.total_working_hours}</Text> Hours
-                    </Text>
+                    {activeTab === 'MATERIAL' ? (
+                      <>
+                        <ArrowRightLeft size={14} color="#94a3b8" />
+                        <Text className="text-slate-500 text-xs font-medium ml-1.5">
+                          <Text className="text-slate-900 font-bold">{entry.quantity}</Text> {entry.unit}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={14} color="#94a3b8" />
+                        <Text className="text-slate-500 text-xs font-medium ml-1.5">
+                          <Text className="text-slate-900 font-bold">{activeTab === 'EQUIPMENT' ? entry.working_hours : entry.total_working_hours}</Text> Hours
+                        </Text>
+                      </>
+                    )}
                   </View>
                 </View>
 
-                {entry.status === 'REJECTED' && (
+                {(entry.status === 'REJECTED' || entry.status === 'SUBMITTED') && (
                   <TouchableOpacity 
                     onPress={() => {
-                      const route = activeTab === 'EQUIPMENT' ? '/(app)/entry/equipment' : '/(app)/entry/labour';
-                      router.push({ pathname: route, params: { id: entry.id } });
+                      const route = activeTab === 'EQUIPMENT' 
+                        ? '/(app)/entry/equipment' 
+                        : activeTab === 'LABOUR'
+                          ? '/(app)/entry/labour'
+                          : '/(app)/entry/material';
+                      router.push({ pathname: route as any, params: { id: entry.id } });
                     }}
                     className="mt-3 flex-row items-center justify-center bg-slate-900 py-3 rounded-xl active:bg-slate-800"
                   >
                     <Edit2 size={16} color="#ffffff" />
-                    <Text className="text-white font-bold ml-2">Edit & Resubmit</Text>
+                    <Text className="text-white font-bold ml-2">
+                      {entry.status === 'REJECTED' ? 'Edit & Resubmit' : 'Edit Entry'}
+                    </Text>
                   </TouchableOpacity>
                 )}
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}

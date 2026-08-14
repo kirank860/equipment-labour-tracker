@@ -1,7 +1,7 @@
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Truck, Eye, EyeOff } from 'lucide-react-native';
+import { Building2, Eye, EyeOff } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 
 export default function LoginScreen() {
@@ -23,6 +23,7 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
+    if (loading) return;
     if (!username || !password) {
       Alert.alert('Error', 'Please enter username and password');
       return;
@@ -52,25 +53,39 @@ export default function LoginScreen() {
         console.error('Role check error:', userError);
       }
 
-      let finalRole = 'FOREMAN';
+      let finalRole = selectedRole; // default to what they selected
 
       if (!userData) {
-        // Auto-create profile with selected role
-        const { error: insertError } = await supabase.from('users').insert({
-          id: data.user.id,
-          full_name: username,
-          email: pseudoEmail,
-          role: selectedRole
-        });
-        
-        if (insertError && insertError.code !== '23505') {
-          console.error('Auto-create profile failed:', insertError);
+        if (selectedRole === 'FOREMAN') {
+          // Auto-create profile for foremen
+          const { error: insertError } = await supabase.from('users').upsert({
+            id: data.user.id,
+            full_name: username,
+            email: pseudoEmail,
+            role: 'FOREMAN'
+          }, { onConflict: 'id' });
+          
+          if (insertError && insertError.code !== '23505') {
+            console.error('Auto-create profile failed:', insertError);
+          }
         }
-        finalRole = selectedRole;
       } else {
-        // Force update the role to what was selected
-        await supabase.from('users').update({ role: selectedRole }).eq('id', data.user.id);
-        finalRole = selectedRole;
+        // Validate that they selected the correct portal
+        if (userData.role !== selectedRole) {
+          await supabase.auth.signOut();
+          Alert.alert('Incorrect Portal', `Your account is registered as an ${userData.role}. Please select the ${userData.role} portal.`);
+          setLoading(false);
+          return;
+        }
+        finalRole = userData.role;
+      }
+
+      // Log the attendance ONLY for foremen
+      if (finalRole !== 'ADMIN') {
+        await supabase.from('attendance_logs').insert({
+          user_id: data.user.id,
+          action: 'LOGIN'
+        });
       }
 
       if (finalRole === 'ADMIN') {
@@ -92,13 +107,20 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 justify-center items-center bg-slate-50 p-6"
     >
-      <View className="w-full max-w-sm bg-white p-8 rounded-[32px] shadow-xl border border-slate-100">
+      <View 
+        className="w-full max-w-sm bg-white p-8 rounded-[32px] border border-slate-100"
+        style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 10 }}
+      >
         <View className="items-center mb-8">
-          <View className="bg-blue-50 p-5 rounded-[24px] mb-5 border border-blue-100">
-            <Truck size={42} color="#1e3a8a" />
+          <View className="bg-white p-2 rounded-3xl mb-4 border border-slate-100" style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
+            <Image 
+              source={require('../assets/images/island_tower_logo.jpg')} 
+              style={{ width: 90, height: 90, borderRadius: 16 }} 
+              resizeMode="contain" 
+            />
           </View>
           <Text className="text-3xl font-black text-slate-900 text-center tracking-tight">
-            TRUXO
+            ISLAND TOWER
           </Text>
           <Text className="text-slate-500 mt-2 text-center font-medium">
             {selectedRole === 'ADMIN' ? 'Admin Portal' : 'Foreman Portal'}
@@ -108,7 +130,8 @@ export default function LoginScreen() {
         <View className="space-y-5">
           <View className="flex-row bg-slate-100 p-1 rounded-2xl mb-2">
             <TouchableOpacity 
-              className={`flex-1 py-3 rounded-xl flex-row justify-center items-center ${selectedRole === 'FOREMAN' ? 'bg-white shadow-sm' : ''}`}
+              className={`flex-1 py-3 rounded-xl flex-row justify-center items-center ${selectedRole === 'FOREMAN' ? 'bg-white' : ''}`}
+              style={selectedRole === 'FOREMAN' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 } : {}}
               onPress={() => handleRoleToggle('FOREMAN')}
               disabled={roleLoading}
             >
@@ -119,7 +142,8 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
             <TouchableOpacity 
-              className={`flex-1 py-3 rounded-xl flex-row justify-center items-center ${selectedRole === 'ADMIN' ? 'bg-white shadow-sm' : ''}`}
+              className={`flex-1 py-3 rounded-xl flex-row justify-center items-center ${selectedRole === 'ADMIN' ? 'bg-white' : ''}`}
+              style={selectedRole === 'ADMIN' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 } : {}}
               onPress={() => handleRoleToggle('ADMIN')}
               disabled={roleLoading}
             >
@@ -170,7 +194,8 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity 
-            className={`w-full bg-[#1e3a8a] active:opacity-80 rounded-2xl p-4 mt-8 items-center flex-row justify-center shadow-lg shadow-blue-900/20 ${loading ? 'opacity-70' : ''}`}
+            className={`w-full bg-[#1e3a8a] active:opacity-80 rounded-2xl p-4 mt-8 items-center flex-row justify-center ${loading ? 'opacity-70' : ''}`}
+            style={{ shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 }}
             onPress={handleLogin}
             disabled={loading}
           >

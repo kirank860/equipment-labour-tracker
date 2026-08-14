@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Home, Truck, Users, User } from 'lucide-react-native';
+import { Home, Truck, Users, User, ArrowRightLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
@@ -9,8 +9,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   
   return (
     <View 
-      className="absolute left-4 right-4 bg-white shadow-xl shadow-slate-200/50 rounded-[28px] flex-row justify-between items-center px-2 py-2"
-      style={{ bottom: Math.max(insets.bottom, 16), elevation: 10 }}
+      className="absolute left-4 right-4 bg-white/95 shadow-sm border border-slate-200 rounded-3xl flex-row justify-between items-center px-2 py-2"
+      style={{ bottom: Math.max(insets.bottom, 16), elevation: 5, backdropFilter: 'blur(10px)' }}
     >
       {state.routes.map((route: any, index: number) => {
         const { options } = descriptors[route.key];
@@ -35,7 +35,11 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           });
 
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params);
+            if (route.name === 'entry/equipment' || route.name === 'entry/labour' || route.name === 'entry/material') {
+              navigation.navigate(route.name, { ...route.params, id: undefined });
+            } else {
+              navigation.navigate(route.name, route.params);
+            }
           }
         };
 
@@ -45,13 +49,13 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           <TouchableOpacity
             key={route.key}
             onPress={onPress}
-            className={`flex-1 items-center justify-center py-2.5 rounded-[20px] ${isFocused ? 'bg-[#273b7a]' : 'bg-transparent'}`}
-            style={{ maxWidth: 80 }}
+            className={`flex-1 items-center justify-center py-2.5 rounded-[20px] active:scale-[0.95] transition-transform ${isFocused ? 'bg-indigo-600' : 'bg-transparent'}`}
           >
             {Icon && <Icon size={22} color={isFocused ? '#ffffff' : '#475569'} strokeWidth={isFocused ? 2.5 : 2} />}
             <Text 
-              className={`text-[10px] mt-1.5 font-bold tracking-widest ${isFocused ? 'text-white' : 'text-slate-600'}`}
-              style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', textAlign: 'center' }}
+              className={`text-[9px] mt-1.5 uppercase tracking-widest ${isFocused ? 'text-white font-outfit-bold' : 'text-slate-500 font-outfit-semibold'}`}
+              style={{ textAlign: 'center' }}
+              numberOfLines={1}
             >
               {label}
             </Text>
@@ -63,7 +67,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function AppLayout() {
-  return (
+  const content = (
     <Tabs 
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{ 
@@ -93,6 +97,13 @@ export default function AppLayout() {
         }} 
       />
       <Tabs.Screen 
+        name="entry/material" 
+        options={{ 
+          title: 'Material',
+          tabBarIcon: ({ color, size }) => <ArrowRightLeft color={color} size={size} />
+        }} 
+      />
+      <Tabs.Screen 
         name="profile" 
         options={{ 
           title: 'Profile',
@@ -105,4 +116,16 @@ export default function AppLayout() {
       <Tabs.Screen name="history" options={{ href: null }} />
     </Tabs>
   );
+
+  if (Platform.OS === 'web') {
+    return (
+      <View className="flex-1 bg-slate-100 items-center justify-center">
+        <View className="w-full max-w-[480px] h-full bg-slate-50 shadow-2xl overflow-hidden border-x border-slate-200">
+          {content}
+        </View>
+      </View>
+    );
+  }
+
+  return content;
 }

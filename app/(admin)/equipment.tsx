@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform, Modal, Image, TextInput, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Modal, Image, TextInput, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Check, X, Download, Filter, Image as ImageIcon, Calendar } from 'lucide-react-native';
+import ConfirmModal from '../../components/ConfirmModal';
 import { useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 export default function AdminEquipment() {
   const { width } = useWindowDimensions();
@@ -40,7 +43,12 @@ export default function AdminEquipment() {
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [selectedRejectId, setSelectedRejectId] = useState<string | null>(null);
+  
+  const [confirmApproveId, setConfirmApproveId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<any>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -88,7 +96,8 @@ export default function AdminEquipment() {
     }
   };
 
-  const handleUpdateStatus = async (id: string, newStatus: string, reason: string | null = null) => {
+  const handleUpdateStatus = async (id: string, newStatus: string, reason: string = '') => {
+    setIsUpdating(true);
     try {
       const updateData: any = { status: newStatus };
       if (reason) {
@@ -104,31 +113,39 @@ export default function AdminEquipment() {
       
       // Update local state
       setEntries(entries.map(e => e.id === id ? { ...e, status: newStatus, rejection_reason: reason } : e));
+      if (rejectModalVisible) {
+        setRejectModalVisible(false);
+        setRejectReason('');
+      }
       
       showToast(`Successfully marked as ${newStatus}`);
     } catch (error) {
       console.error('Error updating status:', error);
       showToast('Could not update status');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
   const submitReject = () => {
     if (selectedRejectId) {
       handleUpdateStatus(selectedRejectId, 'REJECTED', rejectReason);
-      setRejectModalVisible(false);
-      setRejectReason('');
-      setSelectedRejectId(null);
     }
   };
 
-  const exportToCSV = () => {
-    if (Platform.OS !== 'web') {
-      Alert.alert('Export', 'CSV export is only available on the web version currently.');
-      return;
-    }
+  const confirmApprove = (id: string) => {
+    setConfirmApproveId(id);
+  };
 
+  const confirmModalApprove = () => {
+    if (selectedEntry) {
+      setConfirmApproveId(selectedEntry.id);
+    }
+  };
+
+  const exportToCSV = async () => {
     try {
-      const headers = ['Date', 'Job Number', 'Job Name', 'Supplier', 'Equipment', 'Hours', 'Status', 'Foreman', 'Remarks'];
+      const headers = ['Date', 'Job Number', 'Job Name', 'Supplier', 'Equipment', 'Hours', 'Status', 'Foreman', 'Remarks', 'Fuel Provided', 'Fuel Qty', 'Fuel Unit'];
       const rows = entries.map(e => [
         e.entry_date || '', 
         e.jobs?.job_number || '',
@@ -138,19 +155,41 @@ export default function AdminEquipment() {
         e.working_hours || 0,
         e.status || '',
         e.foreman_name || '',
-        (e.remarks || '').replace(/,/g, ';') // Prevent comma injection
+        (e.remarks || '').replace(/,/g, ';'),
+        e.fuel_provided ? 'Yes' : 'No',
+        e.fuel_quantity || '',
+        e.fuel_unit || ''
       ]);
       
       const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `equipment_entries_${getLocalDateString()}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const fileName = `equipment_entries_${getLocalDateString()}.csv`;
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'text/csv',
+            dialogTitle: 'Export Equipment Entries',
+          });
+        } else {
+          Alert.alert('Export Error', 'Sharing is not available on this device');
+        }
+      }
     } catch (error) {
       console.error('Export error:', error);
       showToast('Failed to generate CSV');
@@ -171,6 +210,23 @@ export default function AdminEquipment() {
 
   return (
     <View className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
+      
+      <ConfirmModal 
+        visible={!!confirmApproveId}
+        title="Approve Entry"
+        message="Are you sure you want to approve this entry?"
+        confirmText="Approve"
+        onConfirm={() => {
+          if (confirmApproveId) {
+            handleUpdateStatus(confirmApproveId, 'APPROVED');
+            if (detailsModalVisible) setDetailsModalVisible(false);
+          }
+          setConfirmApproveId(null);
+        }}
+        onCancel={() => setConfirmApproveId(null)}
+        isDestructive={false}
+      />
+
       {/* Photo Viewer Modal */}
       <Modal visible={photoModalVisible} transparent animationType="fade" onRequestClose={() => setPhotoModalVisible(false)}>
         <View className="flex-1 bg-black/95">
@@ -343,8 +399,13 @@ export default function AdminEquipment() {
                 </View>
               ) : (
                 entries.map((entry, index) => (
-                  <View 
+                  <TouchableOpacity 
                     key={entry.id} 
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedEntry(entry);
+                      setDetailsModalVisible(true);
+                    }}
                     className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : `flex-row items-center p-4 border-b border-slate-100 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}`}
                   >
                     {isMobile ? (
@@ -385,31 +446,26 @@ export default function AdminEquipment() {
                               <ImageIcon size={18} color="#1e3a8a" />
                             </TouchableOpacity>
                           )}
-                          {entry.status === 'SUBMITTED' ? (
-                            <>
-                              <TouchableOpacity 
-                                onPress={() => handleUpdateStatus(entry.id, 'APPROVED')}
-                                className="bg-green-100 p-2 rounded-lg border border-green-200 active:bg-green-200 flex-row items-center px-3"
-                              >
-                                <Check size={18} color="#16a34a" />
-                                <Text className="text-green-700 font-bold ml-1 text-xs">Approve</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity 
-                                onPress={() => {
-                                  setSelectedRejectId(entry.id);
-                                  setRejectModalVisible(true);
-                                }}
-                                className="bg-red-100 p-2 rounded-lg border border-red-200 active:bg-red-200 flex-row items-center px-3"
-                              >
-                                <X size={18} color="#dc2626" />
-                                <Text className="text-red-700 font-bold ml-1 text-xs">Reject</Text>
-                              </TouchableOpacity>
-                            </>
-                          ) : (
-                            <View className="flex-row items-center justify-center px-3 py-2 bg-slate-100 rounded-lg border border-slate-200">
-                              <Check size={16} color="#64748b" />
-                              <Text className="text-slate-600 font-bold ml-1 text-xs uppercase">OK</Text>
-                            </View>
+                          {entry.status === 'SUBMITTED' && (
+                            <TouchableOpacity 
+                              onPress={() => confirmApprove(entry.id)}
+                              className="bg-green-100 p-2 rounded-lg border border-green-200 active:bg-green-200 flex-row items-center px-3"
+                            >
+                              <Check size={18} color="#16a34a" />
+                              <Text className="text-green-700 font-bold ml-1 text-xs">Approve</Text>
+                            </TouchableOpacity>
+                          )}
+                          {entry.status === 'SUBMITTED' && (
+                            <TouchableOpacity 
+                              onPress={() => {
+                                setSelectedRejectId(entry.id);
+                                setRejectModalVisible(true);
+                              }}
+                              className="bg-red-100 p-2 rounded-lg border border-red-200 active:bg-red-200 flex-row items-center px-3"
+                            >
+                              <X size={18} color="#dc2626" />
+                              <Text className="text-red-700 font-bold ml-1 text-xs">Reject</Text>
+                            </TouchableOpacity>
                           )}
                         </View>
                       </View>
@@ -441,39 +497,168 @@ export default function AdminEquipment() {
                               <ImageIcon size={18} color="#1e3a8a" />
                             </TouchableOpacity>
                           )}
-                          {entry.status === 'SUBMITTED' ? (
-                            <>
-                              <TouchableOpacity 
-                                onPress={() => handleUpdateStatus(entry.id, 'APPROVED')}
-                                className="bg-green-100 p-2 rounded-lg border border-green-200 active:bg-green-200"
-                              >
-                                <Check size={18} color="#16a34a" />
-                              </TouchableOpacity>
-                              <TouchableOpacity 
-                                onPress={() => {
-                                  setSelectedRejectId(entry.id);
-                                  setRejectModalVisible(true);
-                                }}
-                                className="bg-red-100 p-2 rounded-lg border border-red-200 active:bg-red-200"
-                              >
-                                <X size={18} color="#dc2626" />
-                              </TouchableOpacity>
-                            </>
-                          ) : (
-                            <View className="px-3 py-2 bg-slate-100 rounded-lg border border-slate-200">
-                              <Text className="text-slate-600 font-bold text-xs uppercase">OK</Text>
-                            </View>
+                          {entry.status === 'SUBMITTED' && (
+                            <TouchableOpacity 
+                              onPress={() => confirmApprove(entry.id)}
+                              className="bg-green-100 p-2 rounded-lg border border-green-200 active:bg-green-200"
+                            >
+                              <Check size={18} color="#16a34a" />
+                            </TouchableOpacity>
+                          )}
+                          {entry.status === 'SUBMITTED' && (
+                            <TouchableOpacity 
+                              onPress={() => {
+                                setSelectedRejectId(entry.id);
+                                setRejectModalVisible(true);
+                              }}
+                              className="bg-red-100 p-2 rounded-lg border border-red-200 active:bg-red-200"
+                            >
+                              <X size={18} color="#dc2626" />
+                            </TouchableOpacity>
                           )}
                         </View>
                       </>
                     )}
-                  </View>
+                  </TouchableOpacity>
                 ))
               )}
             </ScrollView>
           )}
         </View>
       </View>
+
+      {/* Details Modal */}
+      <Modal visible={detailsModalVisible} transparent animationType="slide" onRequestClose={() => setDetailsModalVisible(false)}>
+        <View className="flex-1 bg-slate-900/60 justify-end">
+          <View className="bg-white rounded-t-[32px] p-6 max-h-[90%]">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-2xl font-black text-slate-900">Entry Details</Text>
+              <TouchableOpacity onPress={() => setDetailsModalVisible(false)} className="bg-slate-100 p-2 rounded-full active:bg-slate-200">
+                <X size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            
+            {selectedEntry && (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                <View className="flex-row justify-between mb-4">
+                  <View>
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Date</Text>
+                    <Text className="text-slate-900 font-bold text-lg">{selectedEntry.entry_date}</Text>
+                  </View>
+                  <View className="items-end">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Status</Text>
+                    <StatusPill status={selectedEntry.status} />
+                  </View>
+                </View>
+                
+                <View className="h-px bg-slate-100 w-full mb-4" />
+                
+                <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Job Details</Text>
+                <Text className="text-slate-900 font-bold text-base">{selectedEntry.jobs?.job_number}</Text>
+                <Text className="text-slate-500 mb-4">{selectedEntry.jobs?.job_name}</Text>
+
+                <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Equipment</Text>
+                <Text className="text-slate-900 font-bold text-base">{selectedEntry.equipment_master?.equipment_name}</Text>
+                <Text className="text-slate-500 mb-4">{selectedEntry.suppliers?.supplier_name}</Text>
+
+                <View className="flex-row justify-between mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Start Time</Text>
+                    <Text className="text-slate-900 font-bold text-lg">{selectedEntry.start_time || 'N/A'}</Text>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">End Time</Text>
+                    <Text className="text-slate-900 font-bold text-lg">{selectedEntry.end_time || 'N/A'}</Text>
+                  </View>
+                </View>
+
+                <View className="flex-row justify-between mb-6">
+                  <View className="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100 mr-2">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Break</Text>
+                    <Text className="text-slate-900 font-bold text-lg">{selectedEntry.break_hours || 0} hr</Text>
+                  </View>
+                  <View className="flex-1 bg-blue-50 p-4 rounded-2xl border border-blue-100 ml-2">
+                    <Text className="text-xs font-bold text-blue-600 uppercase mb-1">Total</Text>
+                    <Text className="text-blue-700 font-black text-2xl">{selectedEntry.working_hours} hr</Text>
+                  </View>
+                </View>
+
+                {selectedEntry.fuel_provided && (
+                  <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex-row justify-between items-center">
+                    <View>
+                      <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Fuel Provided</Text>
+                      <Text className="text-amber-800 font-bold">Yes</Text>
+                    </View>
+                    <View className="items-end">
+                      <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Quantity</Text>
+                      <Text className="text-amber-800 font-bold">{selectedEntry.fuel_quantity} {selectedEntry.fuel_unit}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {selectedEntry.remarks && (
+                  <View className="mb-4">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Remarks</Text>
+                    <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                      <Text className="text-slate-700 italic">"{selectedEntry.remarks}"</Text>
+                    </View>
+                  </View>
+                )}
+
+                {selectedEntry.rejection_reason && (
+                  <View className="mb-4">
+                    <Text className="text-xs font-bold text-red-400 uppercase mb-1">Rejection Reason</Text>
+                    <View className="bg-red-50 p-4 rounded-2xl border border-red-100">
+                      <Text className="text-red-700 font-medium">{selectedEntry.rejection_reason}</Text>
+                    </View>
+                  </View>
+                )}
+                
+                <View className="mt-2 flex-row justify-between items-center">
+                  <View>
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Submitted By</Text>
+                    <Text className="text-slate-700 font-medium">{selectedEntry.foreman_name}</Text>
+                  </View>
+                  <View>
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1 text-right">Submitted At</Text>
+                    <Text className="text-slate-700 font-medium text-right">
+                      {new Date(selectedEntry.created_at).toLocaleDateString()} at {new Date(selectedEntry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Action Buttons inside Modal */}
+                <View className="mt-8 pt-6 border-t border-slate-100 flex-row space-x-3">
+                  {selectedEntry.status !== 'REJECTED' && (
+                    <TouchableOpacity 
+                      onPress={() => {
+                        setDetailsModalVisible(false);
+                        setSelectedRejectId(selectedEntry.id);
+                        setRejectModalVisible(true);
+                      }}
+                      className="flex-1 bg-red-50 border border-red-200 py-4 rounded-xl items-center active:bg-red-100 flex-row justify-center mr-2"
+                    >
+                      <X size={20} color="#dc2626" />
+                      <Text className="text-red-700 font-bold ml-2">Reject</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {selectedEntry.status !== 'APPROVED' && (
+                    <TouchableOpacity 
+                      onPress={confirmModalApprove}
+                      disabled={isUpdating}
+                      className="flex-1 bg-green-50 border border-green-200 py-4 rounded-xl items-center active:bg-green-100 flex-row justify-center ml-2"
+                    >
+                      {isUpdating ? <ActivityIndicator size="small" color="#16a34a" /> : <Check size={20} color="#16a34a" />}
+                      <Text className="text-green-700 font-bold ml-2">{isUpdating ? 'Approving...' : 'Approve'}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Toast Notification */}
       {toastMessage && (

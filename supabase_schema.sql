@@ -84,6 +84,7 @@ CREATE TABLE labour_entries (
  total_working_hours NUMERIC(4, 2) NOT NULL, -- Computed
  foreman_name VARCHAR(255) NOT NULL,
  engineer_name VARCHAR(255),
+ labour_photo_url TEXT,
  remarks TEXT,
  rejection_reason TEXT,
  status entry_status DEFAULT 'SUBMITTED',

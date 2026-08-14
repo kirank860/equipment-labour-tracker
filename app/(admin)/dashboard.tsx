@@ -1,13 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, useWindowDimensions, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, StatusBar, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Truck, Users, CheckCircle, Clock } from 'lucide-react-native';
+import { Truck, Users, CheckCircle, Clock, ChevronRight, LayoutDashboard, Calendar, Filter } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { getLocalDateString } from '../../lib/dateUtils';
+import DatePickerModal from '../../components/DatePickerModal';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { Download } from 'lucide-react-native';
 
 export default function AdminDashboard() {
-  const { width } = useWindowDimensions();
-  const isMobile = width < 768;
   const router = useRouter();
+
+  const todayStr = getLocalDateString();
+  const [fromDate, setFromDate] = useState(todayStr);
+  const [toDate, setToDate] = useState(todayStr);
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
 
   const [stats, setStats] = useState({
     pendingEquipment: 0,
@@ -16,16 +27,29 @@ export default function AdminDashboard() {
     approvedLabour: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [fromDate, toDate]);
 
   const fetchStats = async () => {
+    setLoading(true);
     try {
-      // In a real app we might want to do count queries via RPC, but for now we fetch and count
-      const { data: equipData } = await supabase.from('equipment_entries').select('status');
-      const { data: labourData } = await supabase.from('labour_entries').select('status');
+      let equipQuery = supabase.from('equipment_entries').select('status');
+      let labourQuery = supabase.from('labour_entries').select('status');
+      
+      if (fromDate) {
+        equipQuery = equipQuery.gte('entry_date', fromDate);
+        labourQuery = labourQuery.gte('entry_date', fromDate);
+      }
+      if (toDate) {
+        equipQuery = equipQuery.lte('entry_date', toDate);
+        labourQuery = labourQuery.lte('entry_date', toDate);
+      }
+
+      const { data: equipData } = await equipQuery;
+      const { data: labourData } = await labourQuery;
 
       let pe = 0, ae = 0, pl = 0, al = 0;
 
@@ -52,77 +76,294 @@ export default function AdminDashboard() {
     }
   };
 
+  const exportDailyReport = async () => {
+    setExporting(true);
+    try {
+      // Fetch both equipment and labour data for the selected date
+      let equipQuery = supabase
+        .from('equipment_entries')
+        .select('entry_date, foreman_name, equipment_master_id, rental_type, working_hours, status');
+        
+      let labourQuery = supabase
+        .from('labour_entries')
+        .select('entry_date, foreman_name, employee_name, total_working_hours, status');
+
+      if (fromDate) {
+        equipQuery = equipQuery.gte('entry_date', fromDate);
+        labourQuery = labourQuery.gte('entry_date', fromDate);
+      }
+      if (toDate) {
+        equipQuery = equipQuery.lte('entry_date', toDate);
+        labourQuery = labourQuery.lte('entry_date', toDate);
+      }
+
+      const { data: equipData, error: eErr } = await equipQuery;
+      const { data: labourData, error: lErr } = await labourQuery;
+
+      if (eErr || lErr) throw new Error('Failed to fetch data for export.');
+
+      if ((!equipData || equipData.length === 0) && (!labourData || labourData.length === 0)) {
+        alert('No data available to export for this date.');
+        setExporting(false);
+        return;
+      }
+
+      let csvString = 'Type,Date,Foreman,Details,Hours,Status\n';
+
+      equipData?.forEach(e => {
+        csvString += `Equipment,${e.entry_date},"${e.foreman_name || ''}","Equip ID: ${e.equipment_master_id} (${e.rental_type})",${e.working_hours},${e.status}\n`;
+      });
+
+      labourData?.forEach(l => {
+        csvString += `Labour,${l.entry_date},"${l.foreman_name || ''}","Emp: ${l.employee_name}",${l.total_working_hours},${l.status}\n`;
+      });
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `Report_${fromDate}_to_${toDate}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        const fileUri = `${FileSystem.documentDirectory}Report_${fromDate}_to_${toDate}.csv`;
+        await FileSystem.writeAsStringAsync(fileUri, csvString, { encoding: FileSystem.EncodingType.UTF8 });
+
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'text/csv',
+            dialogTitle: 'Export Daily Report',
+          });
+        } else {
+          alert('Sharing is not available on this device.');
+        }
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const StatCard = ({ title, value, icon: Icon, colorClass, bgColorClass, iconColor, onPress }: any) => (
-    <TouchableOpacity onPress={onPress} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex-1 mx-2 mb-4 min-w-[200px] active:opacity-80">
-      <View className="flex-row items-start justify-between mb-4">
-        <View className={`${bgColorClass} p-3 rounded-xl`}>
-          <Icon size={24} color={iconColor} />
+    <TouchableOpacity 
+      onPress={onPress} 
+      className="bg-white p-6 rounded-2xl border border-slate-200 mb-4 justify-between active:scale-[0.98] transition-transform shadow-sm"
+      style={{ width: '48%' }}
+    >
+      <View className="flex-row justify-between items-start mb-4">
+        <View className={`${bgColorClass} p-2.5 rounded-xl`}>
+          <Icon size={20} color={iconColor} strokeWidth={2.5} />
         </View>
       </View>
-      <Text className="text-slate-500 text-sm font-semibold mb-1 uppercase tracking-wider">{title}</Text>
-      <Text className={`text-4xl font-black ${colorClass}`}>{value}</Text>
+      <View>
+        <Text className={`text-5xl font-mono-bold ${colorClass} tracking-tighter mb-1`}>{value}</Text>
+        <Text className="text-slate-500 text-[10px] font-outfit-bold uppercase tracking-widest leading-tight">{title}</Text>
+      </View>
     </TouchableOpacity>
   );
 
   return (
-    <ScrollView className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
-      <View className="mb-8">
-        <Text className="text-slate-900 text-3xl font-black tracking-tight">Dashboard Overview</Text>
-        <Text className="text-slate-500 text-base mt-2">Welcome to the Truxo Admin Portal. Here is your daily summary.</Text>
+    <View className="flex-1 bg-slate-50">
+      <StatusBar barStyle="light-content" />
+      
+      {/* Premium Header */}
+      <View className="bg-slate-950 pt-16 pb-8 px-6 rounded-b-[32px] border-b border-slate-900 shadow-sm">
+        <View className="flex-row items-center justify-between mb-2">
+          <View>
+            <Text className="text-white text-3xl font-outfit-black tracking-tight">Dashboard</Text>
+            <Text className="text-indigo-400 text-xs font-outfit-bold uppercase tracking-widest mt-1">Island Tower Admin</Text>
+          </View>
+          <View className="bg-white/10 p-4 rounded-2xl">
+            <LayoutDashboard size={28} color="#ffffff" strokeWidth={2} />
+          </View>
+        </View>
       </View>
 
-      {loading ? (
-        <View className="flex-1 justify-center items-center py-20">
-          <ActivityIndicator size="large" color="#1e3a8a" />
+      <ScrollView className="flex-1 px-5 pt-6" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        {/* Date Range Header */}
+        <View className="flex-row justify-between items-center mb-6 mt-[-10px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <View className="flex-1 mr-3">
+            <Text className="text-slate-500 text-[10px] font-outfit-bold uppercase tracking-widest mb-1">Showing Data For</Text>
+            <Text className="text-slate-900 font-mono-bold text-sm flex-wrap">
+              {fromDate === toDate ? (
+                <Text>
+                  {fromDate} <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest ml-1">{new Date(fromDate).toLocaleDateString('en-US', { weekday: 'long' })}</Text>
+                </Text>
+              ) : (
+                <Text>
+                  {fromDate} <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest mx-1">{new Date(fromDate).toLocaleDateString('en-US', { weekday: 'short' })}</Text> 
+                  <Text className="text-slate-400 mx-1">to</Text> 
+                  {toDate} <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest ml-1">{new Date(toDate).toLocaleDateString('en-US', { weekday: 'short' })}</Text>
+                </Text>
+              )}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            onPress={() => setIsFilterExpanded(!isFilterExpanded)}
+            className={`flex-shrink-0 px-3 py-2 rounded-full flex-row items-center border ${isFilterExpanded ? 'bg-slate-900 border-slate-900' : 'bg-indigo-50 border-indigo-100'}`}
+          >
+            <Filter size={14} color={isFilterExpanded ? '#ffffff' : '#4f46e5'} />
+            <Text className={`font-outfit-bold text-[10px] ml-1.5 tracking-wide ${isFilterExpanded ? 'text-white' : 'text-indigo-600'}`}>
+              {isFilterExpanded ? 'HIDE' : 'FILTER'}
+            </Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <View className="flex-row flex-wrap -mx-2">
-          <StatCard 
-            title="Pending Equipment" 
-            value={stats.pendingEquipment} 
-            icon={Clock} 
-            colorClass="text-yellow-600"
-            bgColorClass="bg-yellow-100"
-            iconColor="#ca8a04"
-            onPress={() => router.push({ pathname: '/(admin)/equipment', params: { filter: 'SUBMITTED' } })}
-          />
-          <StatCard 
-            title="Approved Equipment" 
-            value={stats.approvedEquipment} 
-            icon={CheckCircle} 
-            colorClass="text-green-600"
-            bgColorClass="bg-green-100"
-            iconColor="#16a34a"
-            onPress={() => router.push({ pathname: '/(admin)/equipment', params: { filter: 'APPROVED' } })}
-          />
-          <StatCard 
-            title="Pending Labour" 
-            value={stats.pendingLabour} 
-            icon={Clock} 
-            colorClass="text-yellow-600"
-            bgColorClass="bg-yellow-100"
-            iconColor="#ca8a04"
-            onPress={() => router.push({ pathname: '/(admin)/labour', params: { filter: 'SUBMITTED' } })}
-          />
-          <StatCard 
-            title="Approved Labour" 
-            value={stats.approvedLabour} 
-            icon={CheckCircle} 
-            colorClass="text-green-600"
-            bgColorClass="bg-green-100"
-            iconColor="#16a34a"
-            onPress={() => router.push({ pathname: '/(admin)/labour', params: { filter: 'APPROVED' } })}
-          />
-        </View>
-      )}
-      
-      {!loading && (stats.pendingEquipment === 0 && stats.pendingLabour === 0) && (
-        <View className="mt-8 bg-green-50 p-6 rounded-2xl border border-green-200 items-center justify-center">
-          <CheckCircle size={48} color="#16a34a" className="mb-4" />
-          <Text className="text-green-900 text-xl font-bold">All caught up!</Text>
-          <Text className="text-green-700 text-center mt-2">There are no pending entries requiring your approval.</Text>
-        </View>
-      )}
-    </ScrollView>
+
+        {isFilterExpanded && (
+          <View className={`mb-6 flex-row gap-3`}>
+            <TouchableOpacity 
+              className="flex-row items-center bg-white border border-slate-200 rounded-2xl p-4 flex-1 shadow-sm active:scale-[0.99] relative overflow-hidden"
+              onPress={() => setShowFromPicker(true)}
+            >
+              <View className="bg-indigo-50 p-3 rounded-xl mr-3 border border-indigo-100" pointerEvents="none">
+                <Calendar size={20} color="#4f46e5" />
+              </View>
+              <View className="flex-1" pointerEvents="none">
+                <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest mb-1">From Date</Text>
+                <Text className="text-slate-900 font-mono-bold text-base">{fromDate}</Text>
+              </View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              className="flex-row items-center bg-white border border-slate-200 rounded-2xl p-4 flex-1 shadow-sm active:scale-[0.99] relative overflow-hidden"
+              onPress={() => setShowToPicker(true)}
+            >
+              <View className="bg-indigo-50 p-3 rounded-xl mr-3 border border-indigo-100" pointerEvents="none">
+                <Calendar size={20} color="#4f46e5" />
+              </View>
+              <View className="flex-1" pointerEvents="none">
+                <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest mb-1">To Date</Text>
+                <Text className="text-slate-900 font-mono-bold text-base">{toDate}</Text>
+              </View>
+            </TouchableOpacity>
+
+            <DatePickerModal
+              visible={showFromPicker}
+              date={fromDate}
+              onClose={() => setShowFromPicker(false)}
+              onSelect={(d) => setFromDate(d)}
+            />
+            
+            <DatePickerModal
+              visible={showToPicker}
+              date={toDate}
+              onClose={() => setShowToPicker(false)}
+              onSelect={(d) => setToDate(d)}
+            />
+          </View>
+        )}
+        
+        {loading ? (
+          <View className="py-20 items-center justify-center">
+            <ActivityIndicator size="large" color="#1e3a8a" />
+            <Text className="text-slate-500 mt-4 font-medium">Loading statistics...</Text>
+          </View>
+        ) : (
+          <>
+            {/* Statistics Grid */}
+            <View className="flex-row flex-wrap justify-between">
+              <StatCard 
+                title="Pending Equipment" 
+                value={stats.pendingEquipment} 
+                icon={Clock} 
+                colorClass="text-amber-600"
+                bgColorClass="bg-amber-100"
+                iconColor="#d97706"
+                onPress={() => router.push({ pathname: '/(admin)/equipment', params: { filter: 'SUBMITTED' } })}
+              />
+              <StatCard 
+                title="Pending Labour" 
+                value={stats.pendingLabour} 
+                icon={Clock} 
+                colorClass="text-amber-600"
+                bgColorClass="bg-amber-100"
+                iconColor="#d97706"
+                onPress={() => router.push({ pathname: '/(admin)/labour', params: { filter: 'SUBMITTED' } })}
+              />
+              <StatCard 
+                title="Approved Equipment" 
+                value={stats.approvedEquipment} 
+                icon={CheckCircle} 
+                colorClass="text-green-600"
+                bgColorClass="bg-green-100"
+                iconColor="#16a34a"
+                onPress={() => router.push({ pathname: '/(admin)/equipment', params: { filter: 'APPROVED' } })}
+              />
+              <StatCard 
+                title="Approved Labour" 
+                value={stats.approvedLabour} 
+                icon={CheckCircle} 
+                colorClass="text-green-600"
+                bgColorClass="bg-green-100"
+                iconColor="#16a34a"
+                onPress={() => router.push({ pathname: '/(admin)/labour', params: { filter: 'APPROVED' } })}
+              />
+            </View>
+
+            {(!loading && stats.pendingEquipment === 0 && stats.pendingLabour === 0) && (
+              <View className="mb-6 bg-emerald-50 p-6 rounded-2xl border border-emerald-200 items-center justify-center">
+                <View className="bg-emerald-100 p-3 rounded-full mb-3">
+                  <CheckCircle size={28} color="#10b981" />
+                </View>
+                <Text className="text-emerald-900 text-xl font-outfit-bold tracking-tight">All caught up!</Text>
+                <Text className="text-emerald-700 text-center mt-1 text-sm font-outfit-medium">No pending entries require approval.</Text>
+              </View>
+            )}
+
+            {/* Quick Actions */}
+            <View className="mt-2 mb-8">
+              <Text className="text-slate-900 text-sm font-outfit-bold uppercase tracking-widest mb-4 px-1">Quick Actions</Text>
+              
+              <TouchableOpacity 
+                onPress={() => router.push('/(admin)/equipment')}
+                className="bg-white flex-row items-center p-4 rounded-2xl border border-slate-200 mb-3 shadow-sm active:scale-[0.99] transition-transform"
+              >
+                <View className="bg-slate-50 p-3 rounded-xl mr-4 border border-slate-100">
+                  <Truck size={20} color="#475569" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-slate-900 font-outfit-bold text-[15px]">Manage Equipment</Text>
+                  <Text className="text-slate-500 text-[11px] mt-0.5 font-outfit-medium">Review and approve daily entries</Text>
+                </View>
+                <ChevronRight size={18} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => router.push('/(admin)/labour')}
+                className="bg-white flex-row items-center p-4 rounded-2xl border border-slate-200 shadow-sm active:scale-[0.99] transition-transform"
+              >
+                <View className="bg-slate-50 p-3 rounded-xl mr-4 border border-slate-100">
+                  <Users size={20} color="#475569" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-slate-900 font-outfit-bold text-[15px]">Manage Labour</Text>
+                  <Text className="text-slate-500 text-[11px] mt-0.5 font-outfit-medium">Review and approve daily timesheets</Text>
+                </View>
+                <ChevronRight size={18} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={exportDailyReport}
+                disabled={exporting}
+                className="bg-slate-950 flex-row items-center p-4 rounded-2xl active:scale-[0.99] transition-transform mt-3 shadow-sm"
+              >
+                <View className="bg-slate-800 p-3 rounded-xl mr-4">
+                  {exporting ? <ActivityIndicator color="#fff" size="small" /> : <Download size={20} color="#ffffff" />}
+                </View>
+                <View className="flex-1">
+                  <Text className="text-white font-outfit-bold text-[15px]">Export Daily CSV</Text>
+                  <Text className="text-slate-400 text-[11px] mt-0.5 font-outfit-medium">Download for Google Sheets or Excel</Text>
+                </View>
+                <ChevronRight size={18} color="#475569" />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 }

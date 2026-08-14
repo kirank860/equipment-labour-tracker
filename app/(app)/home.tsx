@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../lib/auth';
 import { Truck, Users, FileCheck2, Clock, Plus, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
@@ -19,9 +19,11 @@ export default function HomeScreen() {
     rejected: 0
   });
 
-  useEffect(() => {
-    fetchStats();
-  }, [selectedDate]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchStats();
+    }, [selectedDate])
+  );
 
   const fetchStats = async () => {
     try {
@@ -29,8 +31,9 @@ export default function HomeScreen() {
       const dateStr = getLocalDateString(selectedDate);
       
       const [eqRes, labRes] = await Promise.all([
-        supabase.from('equipment_entries').select('status').eq('entry_date', dateStr),
-        supabase.from('labour_entries').select('status').eq('entry_date', dateStr)
+        supabase.from('equipment_entries').select('status').eq('entry_date', dateStr).eq('created_by', user?.id),
+        supabase.from('labour_entries').select('status').eq('entry_date', dateStr).eq('created_by', user?.id),
+        new Promise(resolve => setTimeout(resolve, 300))
       ]);
       
       const eqData = eqRes.data || [];
@@ -79,21 +82,29 @@ export default function HomeScreen() {
   const username = user?.email?.split('@')[0] || 'Foreman';
   const capitalizedUsername = username.charAt(0).toUpperCase() + username.slice(1);
 
+  if (loadingStats) {
+    return (
+      <View className="flex-1 bg-slate-50 justify-center items-center">
+        <ActivityIndicator size="large" color="#1e3a8a" />
+      </View>
+    );
+  }
+
   return (
     <ScrollView className="flex-1 bg-slate-50">
       {/* Header section */}
-      <View className="bg-white px-6 pt-16 pb-8 rounded-b-[40px] shadow-lg border-b border-slate-100">
+      <View className="bg-white px-6 pt-16 pb-8 rounded-b-[32px] shadow-sm border-b border-slate-200">
         <View className="flex-row justify-between items-center">
           <View className="flex-1 pr-4">
-            <Text className="text-slate-500 font-semibold tracking-wider text-xs uppercase">Welcome back,</Text>
-            <Text className="text-slate-900 text-3xl font-black tracking-tight mt-1" numberOfLines={1}>
+            <Text className="text-slate-500 font-outfit-bold tracking-wider text-[10px] uppercase">Welcome back,</Text>
+            <Text className="text-slate-900 text-3xl font-outfit-black tracking-tight mt-1" numberOfLines={1}>
               {capitalizedUsername}
             </Text>
-            <Text className="text-slate-400 font-medium text-sm mt-1">Foreman Dashboard</Text>
+            <Text className="text-slate-400 font-outfit-medium text-xs mt-1">Foreman Dashboard</Text>
           </View>
           <View className="flex-row items-center">
-            <View className="w-12 h-12 bg-blue-50 rounded-full items-center justify-center border border-blue-200 shadow-sm">
-              <Text className="text-[#1e3a8a] text-xl font-black">{capitalizedUsername.charAt(0)}</Text>
+            <View className="w-12 h-12 bg-indigo-50 rounded-xl items-center justify-center border border-indigo-100 shadow-sm">
+              <Text className="text-indigo-600 text-xl font-outfit-black">{capitalizedUsername.charAt(0)}</Text>
             </View>
           </View>
         </View>
@@ -101,25 +112,25 @@ export default function HomeScreen() {
 
       <View className="px-6 pt-6 pb-32">
         {/* Date Navigator */}
-        <View className="flex-row justify-between items-center mb-5">
-          <Text className="text-lg font-bold text-slate-900 tracking-tight">
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="text-lg font-outfit-black text-slate-900 tracking-tight">
             {isToday ? "Today's Summary" : 'Summary'}
           </Text>
         </View>
 
-        <View className="flex-row items-center justify-between bg-white rounded-2xl border border-slate-200 p-3 mb-6">
-          <TouchableOpacity onPress={goToPrevDay} className="p-2 bg-slate-100 rounded-xl active:bg-slate-200">
+        <View className="flex-row items-center justify-between bg-white rounded-2xl border border-slate-200 p-3 mb-6 shadow-sm">
+          <TouchableOpacity onPress={goToPrevDay} className="p-2 bg-slate-50 rounded-xl border border-slate-100 active:scale-[0.95] transition-transform">
             <ChevronLeft size={20} color="#334155" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={goToToday} className="items-center px-4">
-            <Text className="text-slate-900 font-black text-base tracking-tight">{formatDate(selectedDate)}</Text>
+          <TouchableOpacity onPress={goToToday} className="items-center px-4 active:opacity-70">
+            <Text className="text-slate-900 font-outfit-bold text-base tracking-tight">{formatDate(selectedDate)}</Text>
             {!isToday && (
-              <Text className="text-blue-600 font-bold text-xs mt-1">Tap to go to Today</Text>
+              <Text className="text-indigo-600 font-outfit-semibold text-[10px] uppercase mt-1 tracking-widest">Tap to go to Today</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity 
             onPress={goToNextDay} 
-            className={`p-2 rounded-xl ${isToday ? 'bg-slate-50' : 'bg-slate-100 active:bg-slate-200'}`}
+            className={`p-2 rounded-xl border ${isToday ? 'bg-transparent border-transparent' : 'bg-slate-50 border-slate-100 active:scale-[0.95] transition-transform'}`}
             disabled={isToday}
           >
             <ChevronRight size={20} color={isToday ? '#cbd5e1' : '#334155'} />
@@ -130,79 +141,79 @@ export default function HomeScreen() {
         <View className="flex-row justify-between mb-3">
           <TouchableOpacity 
             onPress={() => router.push({ pathname: '/(app)/history', params: { date: getLocalDateString(selectedDate), type: 'EQUIPMENT' } })}
-            className="w-[48%] bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 items-center active:opacity-80"
+            className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border border-slate-200 items-center active:scale-[0.98] transition-transform"
           >
-            <View className="bg-blue-50 w-12 h-12 rounded-full items-center justify-center mb-3 border border-blue-100">
-              <Truck size={22} color="#1e3a8a" />
+            <View className="bg-indigo-50 w-10 h-10 rounded-xl items-center justify-center mb-3 border border-indigo-100">
+              <Truck size={20} color="#4f46e5" />
             </View>
-            {loadingStats ? <ActivityIndicator color="#1e3a8a" /> : <Text className="text-3xl font-black text-slate-900 tracking-tight">{stats.equipment}</Text>}
-            <Text className="text-sm text-slate-500 font-medium mt-1">Equipment</Text>
+            <Text className="text-4xl font-mono-bold text-slate-900 tracking-tighter">{stats.equipment}</Text>
+            <Text className="text-[10px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">Equipment</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             onPress={() => router.push({ pathname: '/(app)/history', params: { date: getLocalDateString(selectedDate), type: 'LABOUR' } })}
-            className="w-[48%] bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 items-center active:opacity-80"
+            className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border border-slate-200 items-center active:scale-[0.98] transition-transform"
           >
-            <View className="bg-emerald-50 w-12 h-12 rounded-full items-center justify-center mb-3 border border-emerald-100">
-              <Users size={22} color="#059669" />
+            <View className="bg-emerald-50 w-10 h-10 rounded-xl items-center justify-center mb-3 border border-emerald-100">
+              <Users size={20} color="#10b981" />
             </View>
-            {loadingStats ? <ActivityIndicator color="#059669" /> : <Text className="text-3xl font-black text-slate-900 tracking-tight">{stats.labour}</Text>}
-            <Text className="text-sm text-slate-500 font-medium mt-1">Labour</Text>
+            <Text className="text-4xl font-mono-bold text-slate-900 tracking-tighter">{stats.labour}</Text>
+            <Text className="text-[10px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">Labour</Text>
           </TouchableOpacity>
         </View>
 
         <View className="flex-row justify-between mb-4">
           <TouchableOpacity 
             onPress={() => router.push({ pathname: '/(app)/history', params: { date: getLocalDateString(selectedDate), status: 'SUBMITTED' } })}
-            className="w-[31%] bg-white py-4 px-2 rounded-[20px] shadow-sm border border-slate-100 items-center active:opacity-80"
+            className="w-[31%] bg-white py-4 px-2 rounded-2xl shadow-sm border border-slate-200 items-center active:scale-[0.98] transition-transform"
           >
-            <View className="bg-amber-50 w-10 h-10 rounded-full items-center justify-center mb-2 border border-amber-100">
-              <Clock size={18} color="#d97706" />
+            <View className="bg-amber-50 w-8 h-8 rounded-lg items-center justify-center mb-2 border border-amber-100">
+              <Clock size={16} color="#d97706" />
             </View>
-            {loadingStats ? <ActivityIndicator color="#d97706" /> : <Text className="text-2xl font-black text-slate-900 tracking-tight">{stats.pending}</Text>}
-            <Text className="text-xs text-slate-500 font-semibold mt-1">Pending</Text>
+            <Text className="text-2xl font-mono-bold text-slate-900 tracking-tighter">{stats.pending}</Text>
+            <Text className="text-[9px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">Pending</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             onPress={() => router.push({ pathname: '/(app)/history', params: { date: getLocalDateString(selectedDate), status: 'APPROVED' } })}
-            className="w-[31%] bg-white py-4 px-2 rounded-[20px] shadow-sm border border-slate-100 items-center active:opacity-80"
+            className="w-[31%] bg-white py-4 px-2 rounded-2xl shadow-sm border border-slate-200 items-center active:scale-[0.98] transition-transform"
           >
-            <View className="bg-green-50 w-10 h-10 rounded-full items-center justify-center mb-2 border border-green-100">
-              <FileCheck2 size={18} color="#16a34a" />
+            <View className="bg-emerald-50 w-8 h-8 rounded-lg items-center justify-center mb-2 border border-emerald-100">
+              <FileCheck2 size={16} color="#10b981" />
             </View>
-            {loadingStats ? <ActivityIndicator color="#16a34a" /> : <Text className="text-2xl font-black text-slate-900 tracking-tight">{stats.approved}</Text>}
-            <Text className="text-xs text-slate-500 font-semibold mt-1">Approved</Text>
+            <Text className="text-2xl font-mono-bold text-slate-900 tracking-tighter">{stats.approved}</Text>
+            <Text className="text-[9px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">Approved</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             onPress={() => router.push({ pathname: '/(app)/history', params: { date: getLocalDateString(selectedDate), status: 'REJECTED' } })}
-            className="w-[31%] bg-white py-4 px-2 rounded-[20px] shadow-sm border border-slate-100 items-center active:opacity-80"
+            className="w-[31%] bg-white py-4 px-2 rounded-2xl shadow-sm border border-slate-200 items-center active:scale-[0.98] transition-transform"
           >
-            <View className="bg-red-50 w-10 h-10 rounded-full items-center justify-center mb-2 border border-red-100">
-              <FileCheck2 size={18} color="#dc2626" />
+            <View className="bg-red-50 w-8 h-8 rounded-lg items-center justify-center mb-2 border border-red-100">
+              <FileCheck2 size={16} color="#ef4444" />
             </View>
-            {loadingStats ? <ActivityIndicator color="#dc2626" /> : <Text className="text-2xl font-black text-slate-900 tracking-tight">{stats.rejected}</Text>}
-            <Text className="text-xs text-slate-500 font-semibold mt-1">Rejected</Text>
+            <Text className="text-2xl font-mono-bold text-slate-900 tracking-tighter">{stats.rejected}</Text>
+            <Text className="text-[9px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">Rejected</Text>
           </TouchableOpacity>
         </View>
 
         {/* Quick Actions */}
-        <Text className="text-slate-500 font-semibold text-xs uppercase tracking-wider mt-6 mb-4">Quick Actions</Text>
+        <Text className="text-slate-500 font-outfit-bold text-[10px] uppercase tracking-widest mt-6 mb-4">Quick Actions</Text>
         
         <TouchableOpacity 
-          className="bg-[#1e3a8a] flex-row items-center justify-center py-4 rounded-[20px] shadow-lg shadow-blue-900/20 mb-4 active:opacity-80"
+          className="bg-indigo-600 flex-row items-center justify-center py-4 rounded-2xl shadow-sm mb-3 active:scale-[0.98] transition-transform"
           onPress={() => router.push('/(app)/entry/select')}
         >
-          <Plus size={24} color="white" />
-          <Text className="text-white font-bold text-lg ml-2 tracking-tight">New Daily Entry</Text>
+          <Plus size={20} color="white" />
+          <Text className="text-white font-outfit-bold text-[15px] ml-2 tracking-wide">New Daily Entry</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
-          className="bg-white border border-slate-200 flex-row items-center justify-center py-4 rounded-[20px] active:bg-slate-50"
+          className="bg-white border border-slate-200 shadow-sm flex-row items-center justify-center py-4 rounded-2xl active:scale-[0.98] transition-transform"
           onPress={() => router.push({ pathname: '/(app)/history', params: { date: getLocalDateString(selectedDate) } })}
         >
-          <Clock size={24} color="#64748b" />
-          <Text className="text-slate-700 font-bold text-lg ml-2 tracking-tight">View History</Text>
+          <Clock size={20} color="#64748b" />
+          <Text className="text-slate-700 font-outfit-bold text-[15px] ml-2 tracking-wide">View History</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
