@@ -6,9 +6,8 @@ import { supabase } from '../../../lib/supabase';
 import { ArrowLeft, ChevronDown, Clock, User, Briefcase, Calendar, Check, Camera, Image as ImageIcon, X, Users } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
-import ViewShot from 'react-native-view-shot';
+import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
 import WebCamera from '../../../components/WebCamera';
-import { applyWatermarkWeb } from '../../../lib/watermark';
 import TimePickerModal from '../../../components/TimePickerModal';
 
 type Job = { id: string; job_number: string; job_name: string };
@@ -50,7 +49,7 @@ export default function LabourEntryScreen() {
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
-  const viewShotRef = useRef<any>(null);
+  // viewShotRef removed
 
   const pickImage = async () => {
     try {
@@ -226,17 +225,11 @@ export default function LabourEntryScreen() {
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
         try {
-          let finalBase64Uri = photoUri;
-          if (Platform.OS !== 'web' && viewShotRef.current) {
-            finalBase64Uri = await viewShotRef.current.capture();
-          } else if (Platform.OS === 'web') {
-            const jobName = selectedJob ? selectedJob.job_name : 'Unknown Site';
-            finalBase64Uri = await applyWatermarkWeb(photoUri, jobName);
-          }
-
-          uploadedPhotoUrl = finalBase64Uri;
+          const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
+          const jobName = selectedJob ? selectedJob.job_name : 'Unknown Site';
+          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName);
         } catch (err: any) {
-          throw new Error('Photo processing failed: ' + (err.message || ''));
+          throw new Error('Photo upload failed: ' + (err.message || ''));
         }
       }
 
@@ -629,29 +622,16 @@ export default function LabourEntryScreen() {
                   </TouchableOpacity>
                 </View>
               ) : (
-                <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.7, result: 'data-uri' }}>
-                  <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
-                    <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
-                    
-                    {/* Watermark Overlay */}
-                    <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
-                      <Text className="text-white text-xs font-bold">
-                        {new Date().toLocaleString()}
-                      </Text>
-                      <Text className="text-white text-xs font-semibold">
-                        {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Unknown Site'}
-                      </Text>
-                      <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
-                    </View>
-
-                    <TouchableOpacity 
-                      onPress={() => setPhotoUri(null)}
-                      className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                    >
-                      <X size={20} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-                </ViewShot>
+                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+                  
+                  <TouchableOpacity 
+                    onPress={() => setPhotoUri(null)}
+                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+                  >
+                    <X size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
           ) : Platform.OS === 'web' ? (

@@ -9,9 +9,8 @@ import { ArrowLeft, ChevronDown, Check, X, Camera, Image as ImageIcon, Truck, Ca
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
-import ViewShot from 'react-native-view-shot';
 import WebCamera from '../../../components/WebCamera';
-import { applyWatermarkWeb } from '../../../lib/watermark';
+import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
 import TimePickerModal from '../../../components/TimePickerModal';
 
 // Helper for modal picker
@@ -81,8 +80,7 @@ export default function EquipmentEntryScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
 
-  const viewShotRef = useRef<any>(null);
-
+  // ViewShot removed
   const pickImage = async () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -367,18 +365,12 @@ export default function EquipmentEntryScreen() {
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
         try {
-          let finalBase64Uri = photoUri;
-          if (Platform.OS !== 'web' && viewShotRef.current) {
-            finalBase64Uri = await viewShotRef.current.capture();
-          } else if (Platform.OS === 'web') {
-            const selectedJob = jobs.find((j: any) => j.value === formData.job_id);
-            const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
-            finalBase64Uri = await applyWatermarkWeb(photoUri, jobName);
-          }
-
-          uploadedPhotoUrl = finalBase64Uri;
+          const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
+          const selectedJob = jobs.find((j: any) => j.value === formData.job_id);
+          const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
+          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName);
         } catch (err: any) {
-          throw new Error('Photo processing failed: ' + (err.message || ''));
+          throw new Error('Photo upload failed: ' + (err.message || ''));
         }
       }
 
@@ -863,29 +855,16 @@ export default function EquipmentEntryScreen() {
                   </TouchableOpacity>
                 </View>
               ) : (
-                <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.7, result: 'data-uri' }}>
-                  <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
-                    <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
-                    
-                    {/* Watermark Overlay */}
-                    <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
-                      <Text className="text-white text-xs font-bold">
-                        {new Date().toLocaleString()}
-                      </Text>
-                      <Text className="text-white text-xs font-semibold">
-                        {jobs.find((j: any) => j.value === formData.job_id)?.label || 'Unknown Site'}
-                      </Text>
-                      <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
-                    </View>
-
-                    <TouchableOpacity 
-                      onPress={() => setPhotoUri(null)}
-                      className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                    >
-                      <X size={20} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-                </ViewShot>
+                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+                  
+                  <TouchableOpacity 
+                    onPress={() => setPhotoUri(null)}
+                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+                  >
+                    <X size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
       ) : Platform.OS === 'web' ? (

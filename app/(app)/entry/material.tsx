@@ -9,9 +9,8 @@ import { ArrowLeft, ChevronDown, Check, X, Camera, ArrowRightLeft, Calendar } fr
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
-import ViewShot from 'react-native-view-shot';
+import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
 import WebCamera from '../../../components/WebCamera';
-import { applyWatermarkWeb, downloadWebImage } from '../../../lib/watermark';
 
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -79,7 +78,7 @@ export default function MaterialTransferEntryScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
 
-  const viewShotRef = useRef<any>(null);
+  // viewShotRef removed
 
   const [jobs, setJobs] = useState<any[]>([]);
   
@@ -237,18 +236,12 @@ export default function MaterialTransferEntryScreen() {
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
         try {
-          let finalBase64Uri = photoUri;
-          if (Platform.OS !== 'web' && viewShotRef.current) {
-            finalBase64Uri = await viewShotRef.current.capture();
-          } else if (Platform.OS === 'web') {
-            const selectedJob = jobs.find((j: any) => j.value === formData.from_job_id);
-            const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
-            finalBase64Uri = await applyWatermarkWeb(photoUri, jobName);
-          }
-
-          uploadedPhotoUrl = finalBase64Uri;
+          const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
+          const selectedJob = jobs.find((j: any) => j.value === formData.from_job_id);
+          const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
+          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, `From: ${jobName}`);
         } catch (err: any) {
-          throw new Error('Photo processing failed: ' + (err.message || ''));
+          throw new Error('Photo upload failed: ' + (err.message || ''));
         }
       } else if (!id) {
          setErrors(prev => ({ ...prev, photo: 'Live photo is required' }));
@@ -536,29 +529,16 @@ export default function MaterialTransferEntryScreen() {
                   </TouchableOpacity>
                 </View>
               ) : (
-                <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.7, result: 'data-uri' }}>
-                  <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
-                    <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
-                    
-                    {/* Watermark Overlay */}
-                    <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
-                      <Text className="text-white text-xs font-bold">
-                        {new Date().toLocaleString()}
-                      </Text>
-                      <Text className="text-white text-xs font-semibold">
-                        From: {jobs.find((j: any) => j.value === formData.from_job_id)?.label || 'Unknown'}
-                      </Text>
-                      <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
-                    </View>
-
-                    <TouchableOpacity 
-                      onPress={() => setPhotoUri(null)}
-                      className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                    >
-                      <X size={20} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-                </ViewShot>
+                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+                  
+                  <TouchableOpacity 
+                    onPress={() => setPhotoUri(null)}
+                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+                  >
+                    <X size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
       ) : Platform.OS === 'web' ? (
