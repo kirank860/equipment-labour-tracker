@@ -170,20 +170,21 @@ export default function AdminDashboard() {
     <View className="flex-1 bg-slate-50">
       <StatusBar barStyle="light-content" />
       
-      {/* Premium Header */}
-      <View className="bg-slate-950 pt-16 pb-8 px-6 rounded-b-[32px] border-b border-slate-900 shadow-sm">
-        <View className="flex-row items-center justify-between mb-2">
-          <View>
-            <Text className="text-white text-3xl font-outfit-black tracking-tight">Dashboard</Text>
-            <Text className="text-indigo-400 text-xs font-outfit-bold uppercase tracking-widest mt-1">Island Tower Admin</Text>
-          </View>
-          <View className="bg-white/10 p-4 rounded-2xl">
-            <LayoutDashboard size={28} color="#ffffff" strokeWidth={2} />
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false} bounces={false}>
+        {/* Premium Header */}
+        <View className="bg-slate-950 pt-16 pb-8 px-6 rounded-b-[32px] border-b border-slate-900 shadow-sm">
+          <View className="flex-row items-center justify-between mb-2">
+            <View>
+              <Text className="text-white text-3xl font-outfit-black tracking-tight">Dashboard</Text>
+              <Text className="text-indigo-400 text-xs font-outfit-bold uppercase tracking-widest mt-1">Island Tower Admin</Text>
+            </View>
+            <View className="bg-white/10 p-4 rounded-2xl">
+              <LayoutDashboard size={28} color="#ffffff" strokeWidth={2} />
+            </View>
           </View>
         </View>
-      </View>
 
-      <ScrollView className="flex-1 px-5 pt-6" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <View className="px-5 pt-6">
         {/* Date Range Header */}
         <View className="flex-row justify-between items-center mb-6 mt-[-10px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
           <View className="flex-1 mr-3">
@@ -363,6 +364,7 @@ export default function AdminDashboard() {
             </View>
           </>
         )}
+        </View>
       </ScrollView>
     </View>
   );
