@@ -210,7 +210,8 @@ export default function AdminLabour() {
   };
 
   return (
-    <View className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
+    <View className="flex-1 bg-slate-50">
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
       
       <ConfirmModal 
         visible={!!confirmApproveId}
@@ -375,8 +376,8 @@ export default function AdminLabour() {
         ))}
       </View>
 
-      <View className="flex-1 bg-transparent overflow-hidden">
-        <View className={`flex-1 ${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-4`}>
+      <View className="bg-transparent overflow-hidden">
+        <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-4`}>
           {!isMobile && (
             <View className="flex-row bg-slate-100 border-b border-slate-200 p-4 rounded-t-2xl">
               <Text className="flex-1 font-bold text-slate-700 text-sm">Date</Text>
@@ -393,7 +394,7 @@ export default function AdminLabour() {
               <ActivityIndicator size="large" color="#166534" />
             </View>
           ) : (
-            <ScrollView className="flex-1">
+            <View className="flex-col">
               {entries.length === 0 ? (
                 <View className="py-20 items-center">
                   <Text className="text-slate-500 font-medium">No entries found for this status.</Text>
@@ -523,10 +524,11 @@ export default function AdminLabour() {
                   </TouchableOpacity>
                 ))
               )}
-            </ScrollView>
+            </View>
           )}
         </View>
       </View>
+      </ScrollView>
 
       {/* Details Modal */}
       <Modal visible={detailsModalVisible} transparent animationType="slide" onRequestClose={() => setDetailsModalVisible(false)}>

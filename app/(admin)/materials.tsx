@@ -205,7 +205,8 @@ export default function AdminMaterials() {
   };
 
   return (
-    <View className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
+    <View className="flex-1 bg-slate-50">
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
       
       <ConfirmModal 
         visible={!!confirmApproveId}
@@ -547,7 +548,7 @@ export default function AdminMaterials() {
         </View>
       ) : (
         isMobile ? (
-          <ScrollView className="flex-1 -mx-4 px-4" showsVerticalScrollIndicator={false}>
+          <View className="flex-1 -mx-4 px-4">
             {entries.map((entry) => (
               <TouchableOpacity 
                 key={entry.id} 
@@ -629,9 +630,9 @@ export default function AdminMaterials() {
                 </View>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
         ) : (
-          <View className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <View className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View>
                 {/* Table Header */}
@@ -648,7 +649,7 @@ export default function AdminMaterials() {
                 </View>
 
                 {/* Table Body */}
-                <ScrollView>
+                <View>
                   {entries.map((entry) => (
                     <TouchableOpacity 
                       key={entry.id} 
@@ -707,12 +708,13 @@ export default function AdminMaterials() {
                       </View>
                     </TouchableOpacity>
                   ))}
-                </ScrollView>
+                </View>
               </View>
             </ScrollView>
           </View>
         )
       )}
+      </ScrollView>
     </View>
   );
 }
