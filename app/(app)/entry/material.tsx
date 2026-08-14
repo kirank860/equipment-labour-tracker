@@ -10,6 +10,7 @@ import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
+import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
 
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -240,6 +241,7 @@ export default function MaterialTransferEntryScreen() {
           const selectedJob = jobs.find((j: any) => j.value === formData.from_job_id);
           const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
           uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, `From: ${jobName}`);
+          downloadImageToDevice(uploadedPhotoUrl, `Material_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
         } catch (err: any) {
           throw new Error('Photo upload failed: ' + (err.message || ''));
         }

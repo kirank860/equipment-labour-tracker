@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
 import WebCamera from '../../../components/WebCamera';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
+import { downloadImageToDevice } from '../../../lib/download';
 import TimePickerModal from '../../../components/TimePickerModal';
 
 // Helper for modal picker
@@ -369,6 +370,7 @@ export default function EquipmentEntryScreen() {
           const selectedJob = jobs.find((j: any) => j.value === formData.job_id);
           const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
           uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName);
+          downloadImageToDevice(uploadedPhotoUrl, `Equipment_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
         } catch (err: any) {
           throw new Error('Photo upload failed: ' + (err.message || ''));
         }

@@ -7,6 +7,7 @@ import { ArrowLeft, ChevronDown, Clock, User, Briefcase, Calendar, Check, Camera
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
+import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
 import TimePickerModal from '../../../components/TimePickerModal';
 
@@ -228,6 +229,7 @@ export default function LabourEntryScreen() {
           const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
           const jobName = selectedJob ? selectedJob.job_name : 'Unknown Site';
           uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName);
+          downloadImageToDevice(uploadedPhotoUrl, `Labour_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
         } catch (err: any) {
           throw new Error('Photo upload failed: ' + (err.message || ''));
         }
