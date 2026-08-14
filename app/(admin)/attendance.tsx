@@ -108,6 +108,20 @@ export default function AdminAttendance() {
 
       if (Platform.OS === 'web') {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        try {
+          const file = new File([blob], fileName, { type: 'text/csv' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'Export Attendance Logs',
+            });
+            return;
+          }
+        } catch (err) {
+          // Fall through
+        }
+
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
