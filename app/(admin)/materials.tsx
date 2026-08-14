@@ -578,55 +578,52 @@ export default function AdminMaterials() {
                     <Text className="text-slate-900 font-bold text-sm mt-0.5" numberOfLines={1}>{entry.to_job?.job_number}</Text>
                   </View>
                 </View>
-
-                <View className="flex-row flex-wrap items-center justify-between border-t border-slate-100 pt-4 gap-y-3">
-                  <View className="flex-row items-center mr-2">
-                    <View className="w-8 h-8 rounded-full bg-slate-200 items-center justify-center mr-2">
-                      <Text className="text-slate-600 font-bold text-xs">
-                        {entry.foreman_name ? entry.foreman_name.substring(0, 2).toUpperCase() : 'FM'}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text className="text-slate-900 text-xs font-bold">{entry.foreman_name}</Text>
-                      <Text className="text-slate-400 text-[10px]">Foreman</Text>
-                    </View>
+                <View className="flex-row items-center pt-4 border-t border-slate-100 mb-3">
+                  <View className="w-8 h-8 rounded-full bg-slate-200 items-center justify-center mr-2">
+                    <Text className="text-slate-600 font-bold text-xs">
+                      {entry.foreman_name ? entry.foreman_name.substring(0, 2).toUpperCase() : 'FM'}
+                    </Text>
                   </View>
-                  
-                  <View className="flex-row items-center space-x-2">
-                    {entry.photo_url && entry.photo_url !== 'pending' && (
-                      <TouchableOpacity 
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          setSelectedPhoto(entry.photo_url);
-                          setPhotoModalVisible(true);
-                        }}
-                        className="bg-indigo-50 p-2 rounded-lg border border-indigo-100 mr-2"
-                      >
-                        <ImageIcon size={18} color="#4f46e5" />
-                      </TouchableOpacity>
-                    )}
-                    {entry.status !== 'APPROVED' && (
-                      <TouchableOpacity 
-                        onPress={() => confirmApprove(entry.id)}
-                        className="bg-green-100 p-2 rounded-lg border border-green-200 active:bg-green-200 flex-row items-center px-3"
-                      >
-                        <Check size={18} color="#16a34a" />
-                        <Text className="text-green-700 font-bold ml-1 text-xs">Approve</Text>
-                      </TouchableOpacity>
-                    )}
-                    {entry.status !== 'REJECTED' && (
-                      <TouchableOpacity 
-                        onPress={() => {
-                          setSelectedRejectId(entry.id);
-                          setRejectModalVisible(true);
-                        }}
-                        className="bg-red-100 p-2 rounded-lg border border-red-200 active:bg-red-200 flex-row items-center px-3"
-                      >
-                        <X size={18} color="#dc2626" />
-                        <Text className="text-red-700 font-bold ml-1 text-xs">Reject</Text>
-                      </TouchableOpacity>
-                    )}
+                  <View>
+                    <Text className="text-slate-900 text-xs font-bold">{entry.foreman_name}</Text>
+                    <Text className="text-slate-400 text-[10px]">Foreman</Text>
                   </View>
+                </View>
+                
+                <View className="flex-row justify-end space-x-3 pt-3 border-t border-slate-100">
+                  {entry.photo_url && entry.photo_url !== 'pending' && (
+                    <TouchableOpacity 
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setSelectedPhoto(entry.photo_url);
+                        setPhotoModalVisible(true);
+                      }}
+                      className="bg-indigo-50 p-2 rounded-lg border border-indigo-100 mr-2"
+                    >
+                      <ImageIcon size={18} color="#4f46e5" />
+                    </TouchableOpacity>
+                  )}
+                  {entry.status === 'SUBMITTED' && (
+                    <TouchableOpacity 
+                      onPress={() => confirmApprove(entry.id)}
+                      className="bg-green-100 p-2 rounded-lg border border-green-200 active:bg-green-200 flex-row items-center px-3"
+                    >
+                      <Check size={18} color="#16a34a" />
+                      <Text className="text-green-700 font-bold ml-1 text-xs">Approve</Text>
+                    </TouchableOpacity>
+                  )}
+                  {entry.status === 'SUBMITTED' && (
+                    <TouchableOpacity 
+                      onPress={() => {
+                        setSelectedRejectId(entry.id);
+                        setRejectModalVisible(true);
+                      }}
+                      className="bg-red-100 p-2 rounded-lg border border-red-200 active:bg-red-200 flex-row items-center px-3"
+                    >
+                      <X size={18} color="#dc2626" />
+                      <Text className="text-red-700 font-bold ml-1 text-xs">Reject</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </TouchableOpacity>
             ))}
