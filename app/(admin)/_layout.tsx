@@ -77,12 +77,8 @@ export default function AdminLayout() {
   };
 
   const SidebarContent = () => (
-    <ScrollView 
-      className="flex-1 bg-slate-950" 
-      contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 16, paddingBottom: isMobile ? 120 : 32 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <View className="flex-row items-center justify-between mb-10 px-2">
+    <View className="flex-1 bg-slate-950 flex-col px-4 pt-5" style={{ paddingBottom: isMobile ? 100 : 24 }}>
+      <View className="flex-row items-center justify-between mb-8 px-2">
         <View className="flex-row items-center">
           <View className="bg-white p-1 rounded-xl mr-3 shadow-sm">
             <Image 
@@ -103,7 +99,7 @@ export default function AdminLayout() {
         )}
       </View>
 
-      <View className="mb-6">
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
         <Text className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-4 px-2">Menu</Text>
         <NavItem icon={LayoutDashboard} label="Dashboard" href="/(admin)/dashboard" />
         <NavItem icon={Truck} label="Equipment Entries" href="/(admin)/equipment" />
@@ -115,10 +111,9 @@ export default function AdminLayout() {
         <NavItem icon={Settings} label="Master Data" href="/(admin)/settings" />
         <NavItem icon={UserPlus} label="Foremans" href="/(admin)/employees" />
         <NavItem icon={Shield} label="Admins" href="/(admin)/admins" />
-      </View>
+      </ScrollView>
 
-      <View className="mt-2">
-        <View className="h-px bg-slate-900 mb-4" />
+      <View className="pt-4 border-t border-slate-900 mt-2">
         <TouchableOpacity 
           onPress={handleLogout}
           className="flex-row items-center px-4 py-3 rounded-xl active:bg-slate-900 active:scale-[0.98]"
@@ -127,7 +122,7 @@ export default function AdminLayout() {
           <Text className="ml-3 font-outfit-semibold text-red-500">Logout</Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </View>
   );
 
   return (
@@ -212,9 +207,9 @@ export default function AdminLayout() {
       {/* Mobile Menu Modal */}
       {isMobile && (
         <Modal visible={menuOpen} animationType="slide" transparent={false}>
-          <SafeAreaView className="flex-1 bg-slate-950">
+          <View className="flex-1 bg-slate-950" style={{ paddingTop: Platform.OS === 'web' ? 0 : 40 }}>
             <SidebarContent />
-          </SafeAreaView>
+          </View>
         </Modal>
       )}
     </View>
