@@ -59,7 +59,8 @@ export default function AdminLayout() {
   };
 
   const BottomTabItem = ({ icon: Icon, label, href }: { icon: any, label: string, href: string }) => {
-    const isActive = pathname === href;
+    const normalizedHref = href.replace('/(admin)', '');
+    const isActive = pathname === href || pathname === normalizedHref;
     return (
       <TouchableOpacity 
         onPress={() => router.push(href as any)}
