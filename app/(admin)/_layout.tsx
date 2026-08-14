@@ -77,7 +77,7 @@ export default function AdminLayout() {
   };
 
   const SidebarContent = () => (
-    <View className="flex-1 bg-slate-950 flex-col py-8 px-4">
+    <View className="flex-1 bg-slate-950 flex-col pt-5 pb-8 px-4">
       <View className="flex-row items-center justify-between mb-10 px-2">
         <View className="flex-row items-center">
           <View className="bg-white p-1 rounded-xl mr-3 shadow-sm">
@@ -208,9 +208,9 @@ export default function AdminLayout() {
       {/* Mobile Menu Modal */}
       {isMobile && (
         <Modal visible={menuOpen} animationType="slide" transparent={false}>
-          <View className="flex-1 bg-slate-950 pt-10">
+          <SafeAreaView className="flex-1 bg-slate-950">
             <SidebarContent />
-          </View>
+          </SafeAreaView>
         </Modal>
       )}
     </View>
