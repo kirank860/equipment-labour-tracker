@@ -177,7 +177,8 @@ export default function AdminSettings() {
   };
 
   return (
-    <View className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
+    <View className="flex-1 bg-slate-50">
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
       <View className="flex-row justify-between items-center mb-6">
         <View>
           <Text className="text-slate-900 text-3xl font-black tracking-tight">Master Data</Text>
@@ -216,13 +217,13 @@ export default function AdminSettings() {
         </TouchableOpacity>
       </View>
 
-      <View className="flex-1 bg-transparent overflow-hidden">
+      <View className="bg-transparent overflow-hidden">
         {loading ? (
           <View className="flex-1 justify-center items-center">
             <ActivityIndicator size="large" color="#0f172a" />
           </View>
         ) : (
-          <ScrollView className="flex-1">
+          <View className="flex-1 pb-6">
             {/* JOBS TAB */}
             {activeTab === 'JOBS' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
@@ -493,9 +494,10 @@ export default function AdminSettings() {
                 </TouchableOpacity>
               </View>
             )}
-          </ScrollView>
+            </View>
         )}
       </View>
+      </ScrollView>
 
       {/* Add Job Modal */}
       <Modal visible={addJobModal} transparent animationType="fade">

@@ -133,7 +133,8 @@ export default function ForemanReports() {
 
 
   return (
-    <View className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
+    <View className="flex-1 bg-slate-50">
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
       <View className="mb-6 flex-row justify-between items-end">
         <View>
           <Text className="text-3xl font-black text-slate-900 tracking-tight mb-1">Foreman Reports</Text>
@@ -224,7 +225,7 @@ export default function ForemanReports() {
           <Text className="text-slate-500 mt-4 font-medium">Analyzing foreman data...</Text>
         </View>
       ) : (
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <View className="flex-1 pb-6">
           {foremenStats.length === 0 ? (
             <View className="py-20 items-center justify-center bg-white rounded-3xl border border-slate-100 shadow-sm mt-4">
               <View className="bg-slate-50 p-4 rounded-full mb-4">
@@ -297,8 +298,9 @@ export default function ForemanReports() {
               ))}
             </View>
           )}
-        </ScrollView>
-      )}
+          </View>
+        )}
+      </ScrollView>
 
       {/* Foreman List Modal */}
       <Modal visible={!!selectedForeman && !detailsModalVisible} transparent animationType="slide" onRequestClose={() => setSelectedForeman(null)}>
