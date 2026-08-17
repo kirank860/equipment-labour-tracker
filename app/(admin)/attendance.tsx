@@ -6,6 +6,7 @@ import { getLocalDateString } from '../../lib/dateUtils';
 import DatePickerModal from '../../components/DatePickerModal';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { buildCSV } from '../../lib/csv';
 
 interface GroupedUser {
   user_id: string;
@@ -63,7 +64,8 @@ export default function AdminAttendance() {
       const groups: Record<string, GroupedUser> = {};
       
       data?.forEach(log => {
-        const logDate = log.created_at.split('T')[0];
+        const d = new Date(log.created_at);
+        const logDate = getLocalDateString(d);
         if (filterDate && logDate !== filterDate) return;
 
         const userId = log.user_id;
@@ -103,7 +105,7 @@ export default function AdminAttendance() {
         ];
       });
       
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const csvContent = buildCSV(headers, rows);
       const fileName = `attendance_logs_${getLocalDateString()}.csv`;
 
       if (Platform.OS === 'web') {
@@ -281,7 +283,7 @@ export default function AdminAttendance() {
             <ScrollView className="flex-1 bg-slate-50 p-6">
               {(() => {
                 const filteredLogs = modalFilterDate 
-                  ? selectedUser?.logs.filter(log => log.created_at.startsWith(modalFilterDate))
+                  ? selectedUser?.logs.filter(log => getLocalDateString(new Date(log.created_at)) === modalFilterDate)
                   : selectedUser?.logs;
 
                 const groupedByDate = filteredLogs?.reduce((acc, log) => {

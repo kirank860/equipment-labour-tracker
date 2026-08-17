@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Modal, Image, TextInput, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Modal, Image, TextInput, useWindowDimensions, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Check, X, Download, Filter, Image as ImageIcon, Calendar } from 'lucide-react-native';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -8,6 +8,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { buildCSV } from '../../lib/csv';
 
 export default function AdminEquipment() {
   const { width } = useWindowDimensions();
@@ -155,13 +156,13 @@ export default function AdminEquipment() {
         e.working_hours || 0,
         e.status || '',
         e.foreman_name || '',
-        (e.remarks || '').replace(/,/g, ';'),
+        e.remarks || '',
         e.fuel_provided ? 'Yes' : 'No',
         e.fuel_quantity || '',
         e.fuel_unit || ''
       ]);
-      
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+
+      const csvContent = buildCSV(headers, rows);
       const fileName = `equipment_entries_${getLocalDateString()}.csv`;
 
       if (Platform.OS === 'web') {

@@ -6,9 +6,10 @@ import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString } from '../../lib/dateUtils';
 import DatePickerModal from '../../components/DatePickerModal';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Download } from 'lucide-react-native';
+import { buildCSV } from '../../lib/csv';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -108,16 +109,19 @@ export default function AdminDashboard() {
         return;
       }
 
-      let csvString = 'Type,Date,Foreman,Details,Hours,Status\n';
+      const headers = ['Type', 'Date', 'Foreman', 'Details', 'Hours', 'Status'];
+      const rows: unknown[][] = [];
 
       equipData?.forEach((e: any) => {
         const equipName = e.equipment_master?.equipment_name || 'Unknown Equipment';
-        csvString += `Equipment,${e.entry_date},"${e.foreman_name || ''}","${equipName} (${e.rental_type})",${e.working_hours},${e.status}\n`;
+        rows.push(['Equipment', e.entry_date, e.foreman_name || '', `${equipName} (${e.rental_type})`, e.working_hours, e.status]);
       });
 
-      labourData?.forEach(l => {
-        csvString += `Labour,${l.entry_date},"${l.foreman_name || ''}","Emp: ${l.employee_name}",${l.total_working_hours},${l.status}\n`;
+      labourData?.forEach((l: any) => {
+        rows.push(['Labour', l.entry_date, l.foreman_name || '', `Emp: ${l.employee_name}`, l.total_working_hours, l.status]);
       });
+
+      const csvString = buildCSV(headers, rows);
 
       if (Platform.OS === 'web') {
         const fileName = `Report_${fromDate}_to_${toDate}.csv`;

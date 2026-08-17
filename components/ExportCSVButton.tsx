@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { TouchableOpacity, Text, ActivityIndicator, Alert } from 'react-native';
 import { Download } from 'lucide-react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { buildCSV } from '../lib/csv';
 
 export default function ExportCSVButton({ data, filename = 'export', label = 'Export to CSV', className = '' }: any) {
   const [exporting, setExporting] = useState(false);
@@ -16,13 +17,9 @@ export default function ExportCSVButton({ data, filename = 'export', label = 'Ex
     setExporting(true);
     try {
       // 1. Generate CSV string
-      const headers = Object.keys(data[0]).join(',');
-      const rows = data.map((row: any) => 
-        Object.values(row)
-          .map(val => `"${String(val || '').replace(/"/g, '""')}"`)
-          .join(',')
-      );
-      const csvString = [headers, ...rows].join('\n');
+      const headers = Object.keys(data[0]);
+      const rows = data.map((row: any) => headers.map(key => row[key]));
+      const csvString = buildCSV(headers, rows);
 
       // 2. Save to temp file
       const fileUri = `${FileSystem.documentDirectory}${filename}_${Date.now()}.csv`;

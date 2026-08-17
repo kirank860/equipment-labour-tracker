@@ -8,6 +8,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { buildCSV } from '../../lib/csv';
 
 export default function AdminMaterials() {
   const { width } = useWindowDimensions();
@@ -146,18 +147,18 @@ export default function AdminMaterials() {
       const rows = entries.map(e => [
         e.entry_date || '', 
         e.from_job?.job_number ? `${e.from_job.job_number} - ${e.from_job.job_name}` : '',
-        e.to_job?.job_number ? `${e.to_job.job_number} - ${e.to_job.job_name}` : '', 
-        (e.material_description || '').replace(/,/g, ';'),
+        e.to_job?.job_number ? `${e.to_job.job_number} - ${e.to_job.job_name}` : '',
+        e.material_description || '',
         e.quantity || 0,
         e.unit || '',
         e.vehicle_number || '',
         e.driver_name || '',
         e.status || '',
         e.foreman_name || '',
-        (e.remarks || '').replace(/,/g, ';')
+        e.remarks || ''
       ]);
-      
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+
+      const csvContent = buildCSV(headers, rows);
       const fileName = `material_transfers_${getLocalDateString()}.csv`;
 
       if (Platform.OS === 'web') {

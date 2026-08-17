@@ -8,6 +8,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { buildCSV } from '../../lib/csv';
 
 export default function AdminLabour() {
   const { width } = useWindowDimensions();
@@ -159,10 +160,10 @@ export default function AdminLabour() {
         e.total_working_hours || 0,
         e.status || '',
         e.foreman_name || '',
-        (e.remarks || '').replace(/,/g, ';')
+        e.remarks || ''
       ]);
-      
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+
+      const csvContent = buildCSV(headers, rows);
       const fileName = `labour_entries_${getLocalDateString()}.csv`;
 
       if (Platform.OS === 'web') {
