@@ -161,7 +161,7 @@ export default function MaterialTransferEntryScreen() {
       }
       
       if (id) {
-        const { data: entryData } = await supabase.from('material_transfers').select('*').eq('id', id).eq('created_by', user.id).single();
+        const { data: entryData } = await supabase.from('material_transfers').select('*').eq('id', id).eq('created_by', user?.id).single();
         if (entryData) {
           setFormData({
             entry_date: entryData.entry_date,
@@ -206,6 +206,14 @@ export default function MaterialTransferEntryScreen() {
   };
 
   const updateForm = (key: string, value: any) => {
+    if (key === 'from_job_id' && value === formData.to_job_id) {
+      Alert.alert('Invalid Selection', 'Source and destination jobs cannot be the same.');
+      return;
+    }
+    if (key === 'to_job_id' && value === formData.from_job_id) {
+      Alert.alert('Invalid Selection', 'Source and destination jobs cannot be the same.');
+      return;
+    }
     setFormData(prev => ({ ...prev, [key]: value }));
     if (errors[key]) setErrors(prev => ({ ...prev, [key]: '' }));
   };
@@ -253,9 +261,11 @@ export default function MaterialTransferEntryScreen() {
 
       const payload = {
         entry_date: formData.entry_date,
+        time: new Date().toISOString().split('T')[1].split('.')[0], // Added to bypass database constraint
         from_job_id: formData.from_job_id,
         to_job_id: formData.to_job_id,
         material_description: formData.material_description,
+        material_type: formData.material_description, // Added to fix the database NOT NULL constraint
         quantity: parseFloat(formData.quantity) || 0,
         unit: formData.unit,
         vehicle_number: formData.vehicle_number,
@@ -288,7 +298,8 @@ export default function MaterialTransferEntryScreen() {
       setSuccessVisible(true);
     } catch (error: any) {
       console.error('Submit error:', error);
-      Alert.alert('Error', error.message || 'Failed to submit entry');
+      const errorMessage = error.message || (error.code ? `Error ${error.code}: ${error.details || ''}` : JSON.stringify(error));
+      Alert.alert('Error Submitting Material', errorMessage || 'Failed to submit entry. Check console for details.');
     } finally {
       setSubmitting(false);
     }
